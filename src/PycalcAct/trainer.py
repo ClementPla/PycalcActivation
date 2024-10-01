@@ -81,37 +81,55 @@ class Trainer:
             print(Fore.GREEN, end="")
             return self.dataset.summary
 
-    def reset(self):
+    def reset(self, dataset=None, model=None, optim=None, scheduler=None):
+        if dataset:
+            self.update_dataset(dataset, reset=False)
         self.confmat.reset()
         self.metrics.reset()
-        self.model.load_state_dict(self._initial_state_dict)
-        self.optim.load_state_dict(self._initial_optim_state_dict)
-        if self.scheduler:
-            self.scheduler.load_state_dict(self._initial_scheduler_state_dict)
+
+        if model:
+            self.model = model.to(self.device)
+            self._initial_state_dict = deepcopy(self.model.state_dict())
+        else:
+            self.model.load_state_dict(self._initial_state_dict)
+
+        if optim is None and model is not None:
+            self.optim = self.default_optimizer()
+            self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
+        elif optim:
+            self.optim = optim
+            self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
+        else:
+            self.optim.load_state_dict(self._initial_optim_state_dict)
+
+        if scheduler is None and self.scheduler is not None:
+            self.scheduler = None
+        elif scheduler:
+            self.scheduler = scheduler
 
     def register_last_state(self):
         self._last_state_dict = deepcopy(self.model.state_dict())
 
     @on_keyboard_interrup("register_last_state")
     def train(self, n_epochs: int, val_every: int = 1, verbose: bool = True, seed=1234):
-        torch.manual_seed(seed)
-
         if self.scheduler is None:
             self.scheduler = self.default_scheduler()(T_max=n_epochs)
+            self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
 
         x, y = self.dataset.train_batch(True, to_cuda=True)
         current_best = 0
         xval, yval = self.dataset.val_batch(True, to_cuda=True)
         table = ProgressTable(
             num_decimal_places=2,
+            print_header_every_n_rows=15,
             pbar_show_progress=True,
             pbar_style="square",
             default_column_width=25,
         )
 
         table.add_column("Epoch")
-        table.add_column("Loss")
-        table.add_column(self._store_best, color="green")
+        table.add_column("Loss", color="blue", alignment="right")
+        table.add_column(self._store_best, color="green", alignment="right")
 
         for e in table(
             range(n_epochs),
@@ -131,17 +149,18 @@ class Trainer:
 
             loss.backward()
             self.optim.step()
-            table.update("train loss", loss.item(), aggregate="mean", color="blue")
-            table.update("Epoch", e)
+
             if self.scheduler:
                 self.scheduler.step()
+            table.update("Loss", loss.item(), aggregate="mean", color="blue")
+            table.update("Epoch", e)
             if e % val_every == 0:
                 loss, scores = self.eval(xval, yval)
                 if scores[self._store_best] > current_best:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
                     if verbose:
-                        table[self._store_best] = scores[self._store_best].item() * 100
+                        table.update(self._store_best, scores[self._store_best].item() * 100, color="green")
 
                     table.next_row()
 
@@ -149,18 +168,21 @@ class Trainer:
 
         self.register_last_state()
 
-    def test(self, which="best"):
+    def test(self, which="best", show_confmat=True):
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
         if which == "best":
             self.model.load_state_dict(self._best_state_dict)
+            fig.suptitle("Best Model")
         elif which == "last":
             self.model.load_state_dict(self._last_state_dict)
+            fig.suptitle("Last Model")
 
         callbacks = (
             self.dataset.train_batch,
             self.dataset.val_batch,
             self.dataset.test_batch,
         )
-        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
         for i, (name, callable) in enumerate(zip(["Train", "Val", "Test"], callbacks)):
             x, y = callable(True, to_cuda=True)
@@ -173,8 +195,10 @@ class Trainer:
                 cmap="RdYlGn",
                 labels=self.dataset.labels,
             )
-
-        return fig
+        if show_confmat:
+            fig.show()
+        else:
+            return fig
 
     def eval(self, x, y):
         self.model.eval()

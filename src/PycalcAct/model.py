@@ -3,14 +3,10 @@ import torch.nn as nn
 
 
 class TemporalConvolutions(nn.Module):
-    def __init__(
-        self, n_layers=6, f_size=48, kernel_size=16, n_classes=4, temporal_length=120
-    ) -> None:
+    def __init__(self, n_layers=6, f_size=48, kernel_size=16, n_classes=4, temporal_length=120) -> None:
         super().__init__()
 
-        self.initial_conv = nn.Sequential(
-            nn.Conv1d(1, f_size, kernel_size=kernel_size, padding="same"), nn.ReLU()
-        )
+        self.initial_conv = nn.Sequential(nn.Conv1d(1, f_size, kernel_size=kernel_size, padding="same"), nn.ReLU())
 
         self.layers = nn.ModuleList()
         for i in range(n_layers):
@@ -106,9 +102,7 @@ class TemporalRNN(nn.Module):
                 **kwargs,
             )
 
-        self.final_layer = nn.Linear(
-            hidden_size if not bidirectional else hidden_size * 2, n_classes
-        )
+        self.final_layer = nn.Linear(hidden_size if not bidirectional else hidden_size * 2, n_classes)
 
     def forward(self, x):
         x, hiddens = self.rnn(x)
@@ -125,11 +119,12 @@ class MixedFCTemporalModel(nn.Module):
         n_fc_layers=2,
         temporal_length=120,
         bidirectional=True,
-        rnn_hidden_size=48,
-        fc_hidden_size=48,
+        rnn_hidden_size=32,
+        fc_hidden_size=64,
         n_classes=4,
-        dropout=0.5,
-        use_gru=False,
+        dropout=0.25,
+        pooling=None,
+        use_gru=True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -155,7 +150,10 @@ class MixedFCTemporalModel(nn.Module):
                 **kwargs,
             )
         fcs = []
-        input_size = temporal_length * rnn_hidden_size * 2 ** (bidirectional)
+        input_size = rnn_hidden_size * 2 ** (bidirectional)
+        self.pooling = pooling
+        if not pooling:
+            input_size *= temporal_length
         for i in range(n_fc_layers):
             fc = nn.Sequential(
                 nn.Linear(
@@ -173,7 +171,15 @@ class MixedFCTemporalModel(nn.Module):
 
     def forward(self, x):
         x, hiddens = self.rnn(x)
-        x = x.flatten(1)
+        match self.pooling:
+            case "max":
+                x = torch.max(x, 1)[0]
+            case "mean":
+                x = torch.mean(x, 1)
+            case "last":
+                x = x[:, -1]
+            case None:
+                x = x.flatten(1)
         x = torch.relu(x)
         x = self.fc(x)
         x = self.final_layer(x)
