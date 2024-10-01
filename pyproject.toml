@@ -1,0 +1,32 @@
+[project]
+name = "PycalcActivation"
+version = "0.1.0"
+description = "Neural Network to Learn features of TCR-pHLA affinity"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "colorama",
+    "torch",
+    "torchmetrics",
+    "torchinfo",
+    "progress-table"
+
+]
+readme = "README.md"
+
+
+[project.optional-dependencies]
+dev = ["black", "ruff", "pre-commit"]
+
+notebook = ["ipykernel", "matplotlib"]
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "I", "RUF", "TCH"]
+fixable = ["I", "RUF100", "TCH"]
+fix = true
