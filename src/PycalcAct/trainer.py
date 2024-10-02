@@ -213,6 +213,20 @@ class Trainer:
             self.confmat(y_pred, y)
         return loss, self.metrics.compute()
 
+    def estimate_uncertainty(self, x, n_samples=100):
+        self.model.train()
+        with torch.no_grad():
+            y_pred = torch.stack([torch.softmax(self.model(x), dim=1) for _ in range(n_samples)], dim=0)
+            y_pred_mean = y_pred.mean(dim=0)
+            y_pred_std = y_pred.std(dim=0)
+        return y_pred_mean, y_pred_std
+
+    def load_best(self):
+        self.model.load_state_dict(self._best_state_dict)
+
+    def load_last(self):
+        self.model.load_state_dict(self._last_state_dict)
+
     def update_dataset(self, dataset, reset=True):
         self.dataset = dataset.to(self.device)
         if reset:
