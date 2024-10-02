@@ -171,15 +171,14 @@ class MixedFCTemporalModel(nn.Module):
 
     def forward(self, x):
         x, hiddens = self.rnn(x)
-        match self.pooling:
-            case "max":
-                x = torch.max(x, 1)[0]
-            case "mean":
-                x = torch.mean(x, 1)
-            case "last":
-                x = x[:, -1]
-            case None:
-                x = x.flatten(1)
+        if self.pooling == "max":
+            x = torch.max(x, 1)[0]
+        elif self.pooling == "mean":
+            x = torch.mean(x, 1)
+        elif self.pooling == "last":
+            x = x[:, -1]
+        else:
+            x = x.flatten(1)
         x = torch.relu(x)
         x = self.fc(x)
         x = self.final_layer(x)
