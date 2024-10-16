@@ -116,7 +116,9 @@ class Trainer:
             self.scheduler = self.default_scheduler()(T_max=n_epochs)
             self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
 
-        x, y = self.dataset.train_batch(True, to_cuda=True)
+        x, y = self.dataset.train_batch(True, to_cuda=False)
+        x = x[:8000].cuda()
+        y = y[:8000].cuda()
         current_best = 0
         xval, yval = self.dataset.val_batch(True, to_cuda=True)
         table = ProgressTable(
@@ -145,7 +147,7 @@ class Trainer:
             y = y[idx]
 
             y_pred = self.model(x)
-            loss = self.criterion(y_pred, y)
+            loss = self.criterion(y_pred, y.long())
 
             loss.backward()
             self.optim.step()
@@ -207,7 +209,7 @@ class Trainer:
 
         with torch.no_grad():
             y_pred = self.model(x)
-            loss = self.criterion(y_pred, y)
+            loss = self.criterion(y_pred, y.long())
             y_pred = torch.softmax(y_pred, dim=1)
             self.metrics(y_pred, y)
             self.confmat(y_pred, y)
