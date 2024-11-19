@@ -116,7 +116,6 @@ class Trainer:
             self.scheduler = self.default_scheduler()(T_max=n_epochs)
             self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
 
-        # x, y = self.dataset.train_batch(True, to_cuda=True)
         x, y = self.dataset.train_batch(True, to_cuda=False)
         x = x[:5000].cuda()
         y = y[:5000].cuda()

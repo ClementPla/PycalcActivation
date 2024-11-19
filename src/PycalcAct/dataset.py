@@ -59,7 +59,7 @@ class Dataset:
         self.mapping = {k: v for k, v in enumerate(unique_classes)}
         self.inv_mapping = {v: k for k, v in self.mapping.items()}
 
-        classes_int = np.asarray(classes.astype("category").cat.codes)
+        self.classes_int = np.asarray(classes.astype("category").cat.codes)
         sk = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
         skval = StratifiedShuffleSplit(n_splits=2, test_size=val_size, random_state=seed)
         x = df.iloc[:, -120:].values
@@ -83,13 +83,13 @@ class Dataset:
         self.length_serie = x.shape[-1]
         self.n_classes = len(unique_classes)
 
-        train_idx, test_idx = next(sk.split(x, classes_int))
+        train_idx, test_idx = next(sk.split(x, self.classes_int))
 
         self.x_train = x[train_idx]
         self.x_test = x[test_idx]
 
-        self.y_train = classes_int[train_idx].astype(int)
-        self.y_test = classes_int[test_idx].astype(int)
+        self.y_train = self.classes_int[train_idx].astype(int)
+        self.y_test = self.classes_int[test_idx].astype(int)
 
         train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
         self.x_val = self.x_train[val_idx]
