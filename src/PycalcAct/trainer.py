@@ -3,6 +3,7 @@ from functools import partial
 
 import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as F
 from colorama import Fore, Style
 from progress_table import ProgressTable
 from torchinfo import summary as torch_summary
@@ -24,6 +25,7 @@ class Trainer:
         weight_decay=1e-4,
         store_best="Accuracy",
         device="cuda",
+        batch_size=32,
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -139,13 +141,13 @@ class Trainer:
         ):
             self.model.train()
             self.optim.zero_grad()
+            with torch.cuda.amp.autocast():
+                idx = torch.randperm(x.shape[0], device=x.device)
+                x = x[idx]
+                y = y[idx]
 
-            idx = torch.randperm(x.shape[0], device=x.device)
-            x = x[idx]
-            y = y[idx]
-
-            y_pred = self.model(x)
-            loss = self.criterion(y_pred, y)
+                y_pred = self.model(x)
+                loss = self.criterion(y_pred, y)
 
             loss.backward()
             self.optim.step()
@@ -213,13 +215,44 @@ class Trainer:
             self.confmat(y_pred, y)
         return loss, self.metrics.compute()
 
-    def estimate_uncertainty(self, x, n_samples=100):
+    @torch.inference_mode()
+    def predict(self, x):
+        return torch.softmax(self.model(x), dim=1)
+
+    def get_loss(self, x, y, average=True):
+        self.model.eval()
+        with torch.no_grad():
+            y_pred = self.model(x)
+            if average:
+                loss = self.criterion(y_pred, y)
+            else:
+                loss = F.cross_entropy(y_pred, y, reduction="none")
+        return loss
+
+    def estimate_uncertainty(self, x, y=None, n_samples=100):
         self.model.train()
         with torch.no_grad():
-            y_pred = torch.stack([torch.softmax(self.model(x), dim=1) for _ in range(n_samples)], dim=0)
+            all_preds = []
+            all_losses = []
+            for _ in range(n_samples):
+                pred = self.model(x)
+                if y is not None:
+                    loss = F.cross_entropy(pred, y, reduction="none")
+                    all_losses.append(loss)
+                pred = torch.softmax(pred, dim=1)
+                all_preds.append(pred)
+
+            y_pred = torch.stack(all_preds, dim=0)
             y_pred_mean = y_pred.mean(dim=0)
-            y_pred_std = y_pred.std(dim=0)
+            y_pred_std = y_pred.var(dim=0)
+
+        if y is not None:
+            return y_pred_mean, y_pred_std, torch.stack(all_losses, dim=0)
+
         return y_pred_mean, y_pred_std
+
+    def get_predictions(self, x):
+        pass
 
     def load_best(self):
         self.model.load_state_dict(self._best_state_dict)
@@ -231,3 +264,24 @@ class Trainer:
         self.dataset = dataset.to(self.device)
         if reset:
             self.reset()
+
+    def save(self, path):
+        torch.save(
+            {
+                "model": self.model.state_dict(),
+                "optim": self.optim.state_dict(),
+                "scheduler": self.scheduler.state_dict() if self.scheduler else None,
+                "best": self._best_state_dict,
+                "last": self._last_state_dict,
+            },
+            path,
+        )
+
+    def load(self, path):
+        checkpoint = torch.load(path)
+        self.model.load_state_dict(checkpoint["model"])
+        self.optim.load_state_dict(checkpoint["optim"])
+        if self.scheduler:
+            self.scheduler.load_state_dict(checkpoint["scheduler"])
+        self._best_state_dict = checkpoint["best"]
+        self._last_state_dict = checkpoint["last"]

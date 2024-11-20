@@ -7,18 +7,9 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.utils.class_weight import compute_class_weight
 
 
-class Dataset:
-    def __init__(
-        self,
-        csv_path,
-        csv_pos_path=None,
-        position_to_displacement=True,
-        test_size=0.2,
-        val_size=0.2,
-        seed=1234,
-        remove_mean=False,
-        replace_nan_by_min=True,
-    ):
+class FromLegendFileCSV:
+    def __init__(self, csv_path):
+        self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
         df = pd.read_csv(datapath, header=None)
@@ -32,15 +23,102 @@ class Dataset:
 
         df = df.iloc[sorting_indices]
 
+        classes = df.iloc[:, col_classesAPL]
+        unique_classes = classes.unique()
+        self.mapping = {k: v for k, v in enumerate(unique_classes)}
+        self.inv_mapping = {v: k for k, v in self.mapping.items()}
+        classes_int = np.asarray(classes.astype("category").cat.codes)
+        self.filter = filter_bool
+        self.sorting = sorting_indices
+        self.n_classes = len(unique_classes)
+        self.data = df.iloc[:, -120:].values
+        self.classes_int = classes_int
+
+    @property
+    def features_names(self):
+        return [f"Normalized Ratio {self.datapath.stem}"]
+
+
+class FromMultiFileCSV:
+    def __init__(self, csv_path):
+        assert isinstance(csv_path, list), "csv_path should be a list of paths"
+        datapath = [Path(p) for p in csv_path]
+        assert all([p.exists() for p in datapath]), "All paths should exist"
+        assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
+
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0])
+        datas = []
+        self.fnames = []
+        for p in datapath:
+            if p.name != "legend.csv":
+                self.fnames.append(p.stem)
+                df = pd.read_csv(p, header=None)
+                df = df[self.flegend.filter]
+                df = df.iloc[self.flegend.sorting]
+
+                data = df.iloc[:, -120:].values
+                data = np.expand_dims(data, axis=1)
+                datas.append(data)
+
+        self.data = np.concatenate(datas, axis=1)
+
+    @property
+    def features_names(self):
+        return self.fnames
+
+    @property
+    def classes_int(self):
+        return self.flegend.classes_int
+
+    @property
+    def classes(self):
+        return self.flegend.classes
+
+    @property
+    def sorting(self):
+        return self.flegend.sorting
+
+    @property
+    def filter(self):
+        return self.flegend.filter
+
+    @property
+    def mapping(self):
+        return self.flegend.mapping
+
+    @property
+    def inv_mapping(self):
+        return self.flegend.inv_mapping
+
+
+class Dataset:
+    def __init__(
+        self,
+        csv_path,
+        csv_pos_path=None,
+        position_to_displacement=True,
+        test_size=0.2,
+        val_size=0.2,
+        seed=1234,
+        remove_mean=False,
+        replace_nan_by_min=True,
+    ):
+        if isinstance(csv_path, str) or isinstance(csv_path, Path):
+            f = FromLegendFileCSV(csv_path)
+        elif isinstance(csv_path, list):
+            f = FromMultiFileCSV(csv_path)
+        self.f = f
+
+        self.features_names = f.features_names
         if csv_pos_path is not None:
             df_pos = pd.read_csv(csv_pos_path, header=None)
             df_pos.fillna(0, inplace=True)
             xx = df_pos.iloc[::2]
             yy = df_pos.iloc[1::2]
-            xx = xx[filter_bool]
-            xx = xx.iloc[sorting_indices].values
-            yy = yy[filter_bool]
-            yy = yy.iloc[sorting_indices].values
+            xx = xx[f.filter]
+            xx = xx.iloc[f.sorting].values
+            yy = yy[f.filter]
+            yy = yy.iloc[f.sorting].values
             xx = np.expand_dims(xx, axis=1)
             yy = np.expand_dims(yy, axis=1)
             if position_to_displacement:
@@ -49,21 +127,22 @@ class Dataset:
 
                 d = np.sqrt(dxx**2 + dyy**2)
                 pos_features = d
+                self.features_names += ["Displacement"]
 
             else:
                 pos_features = np.concatenate((xx, yy), axis=1)
+                self.features_names += ["X", "Y"]
 
-        classes = df.iloc[:, col_classesAPL]
-        unique_classes = classes.unique()
-
-        self.mapping = {k: v for k, v in enumerate(unique_classes)}
-        self.inv_mapping = {v: k for k, v in self.mapping.items()}
-
-        classes_int = np.asarray(classes.astype("category").cat.codes)
+        classes_int = f.classes_int
         sk = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
         skval = StratifiedShuffleSplit(n_splits=2, test_size=val_size, random_state=seed)
-        x = df.iloc[:, -120:].values
-        x = np.expand_dims(x, axis=1)
+        if f.data.ndim == 2:
+            x = f.data
+            x = np.expand_dims(x, axis=1)
+        elif f.data.ndim == 3:
+            x = f.data
+        else:
+            raise ValueError("Data should be 2D or 3D")
 
         for row in x:
             if remove_mean:
@@ -79,9 +158,8 @@ class Dataset:
             x = np.concatenate((x, pos_features), axis=1)
 
         self.n_series = x.shape[0]
-        self.features = x.shape[1]
         self.length_serie = x.shape[-1]
-        self.n_classes = len(unique_classes)
+        self.n_classes = len(f.mapping)
 
         train_idx, test_idx = next(sk.split(x, classes_int))
 
@@ -112,7 +190,11 @@ class Dataset:
 
     @property
     def labels(self):
-        return list(self.mapping.values())
+        return list(self.f.mapping.values())
+
+    @property
+    def features(self):
+        return self.x_train.shape[1]
 
     @property
     def weights(self):
@@ -142,18 +224,39 @@ class Dataset:
 
         weights = self.weights
         for i, label in enumerate(labels):
-            data[label].append(np.sum(self.y_train == self.inv_mapping[label]))
-            data[label].append(np.sum(self.y_val == self.inv_mapping[label]))
-            data[label].append(np.sum(self.y_test == self.inv_mapping[label]))
+            data[label].append(np.sum(self.y_train == self.f.inv_mapping[label]))
+            data[label].append(np.sum(self.y_val == self.f.inv_mapping[label]))
+            data[label].append(np.sum(self.y_test == self.f.inv_mapping[label]))
             data[label].append(sum(data[label]))
 
         df = pd.DataFrame(data, index=["Train", "Validation", "Test", "Total"])
         print(f"Dataset summary: timepoints {self.length_serie}, features {self.features}")
+        print("Features:")
+        print(f"{' '.join(self.features_names)}")
         if include_weights:
             print("Class weights:")
             for i, label in enumerate(labels):
                 print(f"{label}: {weights[i].item():.2f}", end=" ")
         return df
+
+    def create_new_feature_by_operations(self, operations):
+        if not isinstance(operations, list):
+            operations = [operations]
+
+        for i, op in enumerate(operations):
+            self.features_names.append(op.__name__)
+            for j, x in enumerate([self.x_train, self.x_val, self.x_test]):
+                new_feature = np.zeros((x.shape[0], len(operations), self.length_serie), dtype=x.dtype)
+                new_feature[:, i, :] = op(x)
+                x = np.concatenate((x, new_feature), axis=1)
+
+                match j:
+                    case 0:
+                        self.x_train = x
+                    case 1:
+                        self.x_val = x
+                    case 2:
+                        self.x_test = x
 
     def get_class_count(self, y):
         return np.bincount(y)
