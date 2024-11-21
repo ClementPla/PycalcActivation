@@ -271,8 +271,10 @@ class Dataset:
         """Return a batch from the data
         @param x: the input data as a numpy array
         @param y: the target data as a numpy array
-        @param time_first: if True, the time dimension is the second one in the input data. If False, the time dimension is the last one.
-        time_first is useful for RNNs, to create an input of shape BxTxF where B is the batch size, T is the time dimension and F is the feature dimension, instead of BxFxT.
+        @param time_first: if True, the time dimension is the second one in the input data.
+        If False, the time dimension is the last one.
+        time_first is useful for RNNs, to create an input of shape BxTxF where B is the batch size,
+        T is the time dimension and F is the feature dimension, instead of BxFxT.
         @param to_cuda: if True, the data is moved to the GPU
 
         """

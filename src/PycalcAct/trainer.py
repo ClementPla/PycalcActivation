@@ -1,5 +1,6 @@
 from copy import deepcopy
 from functools import partial
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
@@ -26,6 +27,9 @@ class Trainer:
         store_best="Accuracy",
         device="cuda",
         batch_size=32,
+        is_regression=False,
+        use_class_weights=True,
+        regression_bounds=None,
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -33,14 +37,19 @@ class Trainer:
 
         self.initial_lr = initial_lr
         self.weight_decay = weight_decay
+        self.is_regression = is_regression
+        self.use_class_weights = use_class_weights
 
         self.optim = optim if optim else self.default_optimizer()
         self.criterion = criterion if criterion else self.default_criterion()
         self.scheduler = scheduler
 
+        self.regression_bounds = regression_bounds
+
         self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
         self._initial_state_dict = deepcopy(self.model.state_dict())
         self._store_best = store_best
+        self.batch_size = batch_size
 
         self.metrics = MetricCollection(
             dict(
@@ -60,7 +69,13 @@ class Trainer:
         return torch.optim.Adam(self.model.parameters(), lr=self.initial_lr, weight_decay=self.weight_decay)
 
     def default_criterion(self):
-        return torch.nn.CrossEntropyLoss(self.dataset.weights).to(self.device)
+        if self.is_regression:
+            return torch.nn.MSELoss()
+        else:
+            if self.use_class_weights:
+                return torch.nn.CrossEntropyLoss(weight=self.dataset.weights).to(self.device)
+            else:
+                return torch.nn.CrossEntropyLoss().to(self.device)
 
     def default_scheduler(self):
         return partial(torch.optim.lr_scheduler.CosineAnnealingLR, self.optim, eta_min=1e-6)
@@ -119,6 +134,9 @@ class Trainer:
             self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
 
         x, y = self.dataset.train_batch(True, to_cuda=True)
+
+        batch_size = len(x) if self.batch_size is None else self.batch_size
+
         current_best = 0
         xval, yval = self.dataset.val_batch(True, to_cuda=True)
         table = ProgressTable(
@@ -139,18 +157,23 @@ class Trainer:
             description="Epoch",
             show_eta=True,
         ):
+            idx = torch.randperm(x.shape[0], device=x.device)
+            x = x[idx]
+            y = y[idx]
+
             self.model.train()
-            self.optim.zero_grad()
-            with torch.cuda.amp.autocast():
-                idx = torch.randperm(x.shape[0], device=x.device)
-                x = x[idx]
-                y = y[idx]
+            for i in range(0, len(x), batch_size):
+                self.optim.zero_grad()
+                x_batch = x[i : i + batch_size]
+                y_batch = y[i : i + batch_size]
+                # Take batch size:
 
-                y_pred = self.model(x)
-                loss = self.criterion(y_pred, y)
+                with torch.cuda.amp.autocast():
+                    y_pred = self.model(x_batch)
+                    loss = self.criterion(y_pred, y_batch)
 
-            loss.backward()
-            self.optim.step()
+                loss.backward()
+                self.optim.step()
 
             if self.scheduler:
                 self.scheduler.step()
@@ -202,17 +225,29 @@ class Trainer:
         else:
             return fig
 
+    @torch.inference_mode()
     def eval(self, x, y):
         self.model.eval()
         self.metrics.reset()
         self.confmat.reset()
 
+        batch_size = len(x) if self.batch_size is None else self.batch_size
+
         with torch.no_grad():
-            y_pred = self.model(x)
-            loss = self.criterion(y_pred, y)
-            y_pred = torch.softmax(y_pred, dim=1)
-            self.metrics(y_pred, y)
-            self.confmat(y_pred, y)
+            for i in range(0, len(x), batch_size):
+                xbatch = x[i : i + batch_size]
+                ybatch = y[i : i + batch_size]
+
+                y_pred = self.model(xbatch)
+                loss = self.criterion(y_pred, ybatch)
+                if self.is_regression:
+                    # From continuous to categorical
+                    # use regression_bounds to define the thresholds
+                    y_pred = torch.bucketize(y_pred, self.regression_bounds)
+                else:
+                    y_pred = torch.softmax(y_pred, dim=1)
+                self.metrics.update(y_pred, ybatch)
+                self.confmat.update(y_pred, ybatch)
         return loss, self.metrics.compute()
 
     @torch.inference_mode()
@@ -266,6 +301,7 @@ class Trainer:
             self.reset()
 
     def save(self, path):
+        Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "model": self.model.state_dict(),
