@@ -190,7 +190,6 @@ class Trainer:
                     table.next_row()
 
         table.close()
-
         self.register_last_state()
 
     def test(self, which="best", show_confmat=True):
@@ -321,3 +320,13 @@ class Trainer:
             self.scheduler.load_state_dict(checkpoint["scheduler"])
         self._best_state_dict = checkpoint["best"]
         self._last_state_dict = checkpoint["last"]
+
+    def list_hparams(self):
+        return {
+            "initial_lr": self.initial_lr,
+            "weight_decay": self.weight_decay,
+            "batch_size": self.batch_size,
+            "is_regression": self.is_regression,
+            "use_class_weights": self.use_class_weights,
+            "regression_bounds": self.regression_bounds,
+        }

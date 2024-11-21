@@ -110,6 +110,8 @@ class Dataset:
         self.f = f
 
         self.features_names = f.features_names
+        self.remove_mean = remove_mean
+        self.position_to_displacement = position_to_displacement
         if csv_pos_path is not None:
             df_pos = pd.read_csv(csv_pos_path, header=None)
             df_pos.fillna(0, inplace=True)
@@ -181,6 +183,19 @@ class Dataset:
         self.min = np.min(self.x_train)
 
         self._autocuda = True
+
+    def drop_features(self, index):
+        self.x_train = np.delete(self.x_train, index, axis=1)
+        self.x_val = np.delete(self.x_val, index, axis=1)
+        self.x_test = np.delete(self.x_test, index, axis=1)
+        self.features_names = np.delete(self.features_names, index).tolist()
+
+    def drop_features_by_name(self, *name):
+        if not isinstance(name, (tuple, list)):
+            name = [name]
+        for n in name:
+            index = self.features_names.index(n)
+            self.drop_features(index)
 
     def __len__(self):
         return self.n_series
@@ -307,3 +322,15 @@ class Dataset:
         else:
             self._autocuda = False
         return self
+
+    def list_hparams(self):
+        return {
+            "input_files": self.f.fnames,
+            "n_series": self.n_series,
+            "length_serie": self.length_serie,
+            "n_classes": self.n_classes,
+            "features": self.features,
+            "labels": self.labels,
+            "features_names": self.features_names,
+            "position_to_displacement": self.position_to_displacement,
+        }
