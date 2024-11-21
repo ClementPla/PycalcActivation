@@ -154,6 +154,13 @@ class Dataset:
                 min_val = np.nanmin(row)
             else:
                 min_val = 0
+            if remove_mean:
+                mean_val = np.nanmean(row)
+                row -= mean_val
+            if replace_nan_by_min:
+                min_val = np.nanmin(row)
+            else:
+                min_val = 0
             row[np.isnan(row)] = min_val
 
         if csv_pos_path is not None:

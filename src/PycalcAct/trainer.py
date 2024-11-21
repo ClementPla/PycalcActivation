@@ -101,8 +101,31 @@ class Trainer:
     def reset(self, dataset=None, model=None, optim=None, scheduler=None):
         if dataset:
             self.update_dataset(dataset, reset=False)
+    def reset(self, dataset=None, model=None, optim=None, scheduler=None):
+        if dataset:
+            self.update_dataset(dataset, reset=False)
         self.confmat.reset()
         self.metrics.reset()
+
+        if model:
+            self.model = model.to(self.device)
+            self._initial_state_dict = deepcopy(self.model.state_dict())
+        else:
+            self.model.load_state_dict(self._initial_state_dict)
+
+        if optim is None and model is not None:
+            self.optim = self.default_optimizer()
+            self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
+        elif optim:
+            self.optim = optim
+            self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
+        else:
+            self.optim.load_state_dict(self._initial_optim_state_dict)
+
+        if scheduler is None and self.scheduler is not None:
+            self.scheduler = None
+        elif scheduler:
+            self.scheduler = scheduler
 
         if model:
             self.model = model.to(self.device)
@@ -132,6 +155,7 @@ class Trainer:
         if self.scheduler is None:
             self.scheduler = self.default_scheduler()(T_max=n_epochs)
             self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
+            self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
 
         x, y = self.dataset.train_batch(True, to_cuda=True)
 
@@ -142,12 +166,15 @@ class Trainer:
         table = ProgressTable(
             num_decimal_places=2,
             print_header_every_n_rows=15,
+            print_header_every_n_rows=15,
             pbar_show_progress=True,
             pbar_style="square",
             default_column_width=25,
         )
 
         table.add_column("Epoch")
+        table.add_column("Loss", color="blue", alignment="right")
+        table.add_column(self._store_best, color="green", alignment="right")
         table.add_column("Loss", color="blue", alignment="right")
         table.add_column(self._store_best, color="green", alignment="right")
 
@@ -179,12 +206,15 @@ class Trainer:
                 self.scheduler.step()
             table.update("Loss", loss.item(), aggregate="mean", color="blue")
             table.update("Epoch", e)
+            table.update("Loss", loss.item(), aggregate="mean", color="blue")
+            table.update("Epoch", e)
             if e % val_every == 0:
                 loss, scores = self.eval(xval, yval)
                 if scores[self._store_best] > current_best:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
                     if verbose:
+                        table.update(self._store_best, scores[self._store_best].item() * 100, color="green")
                         table.update(self._store_best, scores[self._store_best].item() * 100, color="green")
 
                     table.next_row()
@@ -195,11 +225,16 @@ class Trainer:
     def test(self, which="best", show_confmat=True):
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
+    def test(self, which="best", show_confmat=True):
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
         if which == "best":
             self.model.load_state_dict(self._best_state_dict)
             fig.suptitle("Best Model")
+            fig.suptitle("Best Model")
         elif which == "last":
             self.model.load_state_dict(self._last_state_dict)
+            fig.suptitle("Last Model")
             fig.suptitle("Last Model")
 
         callbacks = (
@@ -219,6 +254,10 @@ class Trainer:
                 cmap="RdYlGn",
                 labels=self.dataset.labels,
             )
+        if show_confmat:
+            fig.show()
+        else:
+            return fig
         if show_confmat:
             fig.show()
         else:
@@ -287,6 +326,20 @@ class Trainer:
 
     def get_predictions(self, x):
         pass
+
+    def load_best(self):
+        self.model.load_state_dict(self._best_state_dict)
+
+    def load_last(self):
+        self.model.load_state_dict(self._last_state_dict)
+
+    def estimate_uncertainty(self, x, n_samples=100):
+        self.model.train()
+        with torch.no_grad():
+            y_pred = torch.stack([torch.softmax(self.model(x), dim=1) for _ in range(n_samples)], dim=0)
+            y_pred_mean = y_pred.mean(dim=0)
+            y_pred_std = y_pred.std(dim=0)
+        return y_pred_mean, y_pred_std
 
     def load_best(self):
         self.model.load_state_dict(self._best_state_dict)
