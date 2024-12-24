@@ -166,7 +166,7 @@ class Trainer:
         table = ProgressTable(
             num_decimal_places=2,
             print_header_every_n_rows=15,
-            print_header_every_n_rows=15,
+            # print_header_every_n_rows=15,
             pbar_show_progress=True,
             pbar_style="square",
             default_column_width=25,
@@ -197,7 +197,7 @@ class Trainer:
 
                 with torch.cuda.amp.autocast():
                     y_pred = self.model(x_batch)
-                    loss = self.criterion(y_pred, y_batch)
+                    loss = self.criterion(float(y_pred), y_batch)
 
                 loss.backward()
                 self.optim.step()

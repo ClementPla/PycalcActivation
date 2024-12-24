@@ -14,15 +14,16 @@ class FromLegendFileCSV:
 
         df = pd.read_csv(datapath, header=None)
 
-        col_ageSpeActivated = 4
-        col_classesAPL = 9
-
-        filter_bool = ((df[col_ageSpeActivated] == 1) & (df[col_classesAPL] != " ")).values
+        col_ageSpe = 0
+        col_activated = 2
+        col_classesAPL = 6
+        col_normFactor = 4
+        filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
         df = df[filter_bool]
         sorting_indices = df[col_classesAPL].argsort()
 
         df = df.iloc[sorting_indices]
-
+        normFactor = df.iloc[:, col_normFactor]
         classes = df.iloc[:, col_classesAPL]
         unique_classes = classes.unique()
         self.mapping = {k: v for k, v in enumerate(unique_classes)}
@@ -33,6 +34,7 @@ class FromLegendFileCSV:
         self.n_classes = len(unique_classes)
         self.data = df.iloc[:, -120:].values
         self.classes_int = classes_int
+        self.normFactor = np.asarray(normFactor)
 
     @property
     def features_names(self):
@@ -40,13 +42,14 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, ):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
         self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0])
+        self.normFactor =  self.flegend.normFactor
         datas = []
         self.fnames = []
         for p in datapath:
@@ -59,7 +62,6 @@ class FromMultiFileCSV:
                 data = df.iloc[:, -120:].values
                 data = np.expand_dims(data, axis=1)
                 datas.append(data)
-
         self.data = np.concatenate(datas, axis=1)
 
     @property
@@ -108,7 +110,7 @@ class Dataset:
         elif isinstance(csv_path, list):
             f = FromMultiFileCSV(csv_path)
         self.f = f
-
+        self.normFactor = f.normFactor
         self.features_names = f.features_names
         self.remove_mean = remove_mean
         self.position_to_displacement = position_to_displacement
@@ -154,15 +156,8 @@ class Dataset:
                 min_val = np.nanmin(row)
             else:
                 min_val = 0
-            if remove_mean:
-                mean_val = np.nanmean(row)
-                row -= mean_val
-            if replace_nan_by_min:
-                min_val = np.nanmin(row)
-            else:
-                min_val = 0
             row[np.isnan(row)] = min_val
-
+            
         if csv_pos_path is not None:
             x = np.concatenate((x, pos_features), axis=1)
 
@@ -178,12 +173,17 @@ class Dataset:
         self.y_train = classes_int[train_idx].astype(int)
         self.y_test = classes_int[test_idx].astype(int)
 
+        self.norm_train = self.normFactor[train_idx]
+        self.norm_test = self.normFactor[test_idx]
+
         train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
         self.x_val = self.x_train[val_idx]
         self.y_val = self.y_train[val_idx]
+        self.norm_val = self.norm_train[val_idx]
         self.x_train = self.x_train[train_idx]
         self.y_train = self.y_train[train_idx]
-
+        self.norm_train = self.norm_train[train_idx]
+        
         self.data = x
 
         self.max = np.max(self.x_train)
@@ -279,6 +279,20 @@ class Dataset:
                         self.x_val = x
                     case 2:
                         self.x_test = x
+
+    # def normalize(self):
+    #     for j, x_norm in enumerate(zip([self.x_train, self.x_val, self.x_test], [self.norm_train, self.norm_val, self.norm_test])):
+    #         x = x_norm[0]
+    #         norm = x_norm[1]
+    #         for row, naMFI in zip(x, norm):
+    #                 row = row/naMFI
+    #         match j:
+    #             case 0:
+    #                 self.x_train = x
+    #             case 1:
+    #                 self.x_val = x
+    #             case 2:
+    #                 self.x_test = x
 
     def get_class_count(self, y):
         return np.bincount(y)
