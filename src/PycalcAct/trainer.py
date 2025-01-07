@@ -192,13 +192,13 @@ class Trainer:
             for i in range(0, len(x), batch_size):
                 self.optim.zero_grad()
                 x_batch = x[i : i + batch_size]
-                y_batch = y[i : i + batch_size]
+                y_batch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
                 # Take batch size:
 
-                with torch.cuda.amp.autocast():
+                with torch.autocast("cuda"): #torch.cuda.amp.autocast()
                     y_pred = self.model(x_batch)
-                    loss = self.criterion(float(y_pred), y_batch)
-
+                    loss = self.criterion(y_pred, y_batch)
+                
                 loss.backward()
                 self.optim.step()
 
@@ -209,7 +209,7 @@ class Trainer:
             table.update("Loss", loss.item(), aggregate="mean", color="blue")
             table.update("Epoch", e)
             if e % val_every == 0:
-                loss, scores = self.eval(xval, yval)
+                loss, scores = self.eval(xval, yval.type(torch.LongTensor).to(self.device))
                 if scores[self._store_best] > current_best:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
@@ -221,9 +221,6 @@ class Trainer:
 
         table.close()
         self.register_last_state()
-
-    def test(self, which="best", show_confmat=True):
-        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
     def test(self, which="best", show_confmat=True):
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
@@ -245,7 +242,7 @@ class Trainer:
 
         for i, (name, callable) in enumerate(zip(["Train", "Val", "Test"], callbacks)):
             x, y = callable(True, to_cuda=True)
-            loss, scores = self.eval(x, y)
+            loss, scores = self.eval(x, y.type(torch.LongTensor).to(self.device))
             axs[i].set_title(
                 f"Accuracy {(name)} {scores['Accuracy'].item():.2%}, Cohen's Kappa {scores['CohenKappa'].item():.1%}"
             )
@@ -256,12 +253,9 @@ class Trainer:
             )
         if show_confmat:
             fig.show()
+            return scores
         else:
-            return fig
-        if show_confmat:
-            fig.show()
-        else:
-            return fig
+            return fig, scores
 
     @torch.inference_mode()
     def eval(self, x, y):
@@ -274,7 +268,7 @@ class Trainer:
         with torch.no_grad():
             for i in range(0, len(x), batch_size):
                 xbatch = x[i : i + batch_size]
-                ybatch = y[i : i + batch_size]
+                ybatch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
 
                 y_pred = self.model(xbatch)
                 loss = self.criterion(y_pred, ybatch)
@@ -295,7 +289,7 @@ class Trainer:
     def get_loss(self, x, y, average=True):
         self.model.eval()
         with torch.no_grad():
-            y_pred = self.model(x)
+            y_pred = self.model(x).type(torch.LongTensor).to(self.device)
             if average:
                 loss = self.criterion(y_pred, y)
             else:
@@ -353,7 +347,7 @@ class Trainer:
             self.reset()
 
     def save(self, path):
-        Path(path).mkdir(parents=True, exist_ok=True)
+        # Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "model": self.model.state_dict(),
@@ -362,7 +356,7 @@ class Trainer:
                 "best": self._best_state_dict,
                 "last": self._last_state_dict,
             },
-            path,
+            Path(path),
         )
 
     def load(self, path):

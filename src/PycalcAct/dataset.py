@@ -8,7 +8,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 
 class FromLegendFileCSV:
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, customFilter):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
@@ -18,7 +18,12 @@ class FromLegendFileCSV:
         col_activated = 2
         col_classesAPL = 6
         col_normFactor = 4
-        filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
+        col_customFilter = 8
+        myDay = pd.DataFrame([d[0:8] for d in df[col_customFilter]])
+        if customFilter == None:
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
+        else:
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ") & (myDay[0] != customFilter)).values
         df = df[filter_bool]
         sorting_indices = df[col_classesAPL].argsort()
 
@@ -42,13 +47,13 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, ):
+    def __init__(self, csv_path, customFilter):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0])
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter)
         self.normFactor =  self.flegend.normFactor
         datas = []
         self.fnames = []
@@ -104,11 +109,12 @@ class Dataset:
         seed=1234,
         remove_mean=False,
         replace_nan_by_min=True,
+        customFilter = None
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path)
+            f = FromLegendFileCSV(csv_path, customFilter)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path)
+            f = FromMultiFileCSV(csv_path, customFilter)
         self.f = f
         self.normFactor = f.normFactor
         self.features_names = f.features_names
