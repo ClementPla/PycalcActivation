@@ -17,7 +17,6 @@ class FromLegendFileCSV:
         col_ageSpe = 0
         col_activated = 2
         col_classesAPL = 6
-        col_normFactor = 4
         col_customFilter = 8
         myDay = pd.DataFrame([d[0:8] for d in df[col_customFilter]])
         if customFilter == None:
@@ -28,7 +27,6 @@ class FromLegendFileCSV:
         sorting_indices = df[col_classesAPL].argsort()
 
         df = df.iloc[sorting_indices]
-        normFactor = df.iloc[:, col_normFactor]
         classes = df.iloc[:, col_classesAPL]
         unique_classes = classes.unique()
         self.mapping = {k: v for k, v in enumerate(unique_classes)}
@@ -39,7 +37,6 @@ class FromLegendFileCSV:
         self.n_classes = len(unique_classes)
         self.data = df.iloc[:, -120:].values
         self.classes_int = classes_int
-        self.normFactor = np.asarray(normFactor)
 
     @property
     def features_names(self):
@@ -54,7 +51,6 @@ class FromMultiFileCSV:
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
         self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter)
-        self.normFactor =  self.flegend.normFactor
         datas = []
         self.fnames = []
         for p in datapath:
@@ -109,19 +105,22 @@ class Dataset:
         seed=1234,
         remove_mean=False,
         replace_nan_by_min=True,
-        customFilter = None
+        customFilter = None,
+        forEval = False
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
             f = FromLegendFileCSV(csv_path, customFilter)
         elif isinstance(csv_path, list):
             f = FromMultiFileCSV(csv_path, customFilter)
+        self.forEval = forEval
         self.f = f
-        self.normFactor = f.normFactor
         self.features_names = f.features_names
         self.remove_mean = remove_mean
         self.position_to_displacement = position_to_displacement
         if csv_pos_path is not None:
             df_pos = pd.read_csv(csv_pos_path, header=None)
+
+            ### Do something about this
             df_pos.fillna(0, inplace=True)
             xx = df_pos.iloc[::2]
             yy = df_pos.iloc[1::2]
@@ -140,6 +139,9 @@ class Dataset:
                 self.features_names += ["Displacement"]
 
             else:
+                # remove initial position
+                xx = xx - xx[0]
+                yy = yy - yy[0]
                 pos_features = np.concatenate((xx, yy), axis=1)
                 self.features_names += ["X", "Y"]
 
@@ -167,33 +169,40 @@ class Dataset:
         if csv_pos_path is not None:
             x = np.concatenate((x, pos_features), axis=1)
 
+
         self.n_series = x.shape[0]
         self.length_serie = x.shape[-1]
         self.n_classes = len(f.mapping)
 
-        train_idx, test_idx = next(sk.split(x, classes_int))
+        if not forEval:
+            train_idx, test_idx = next(sk.split(x, classes_int))
 
-        self.x_train = x[train_idx]
-        self.x_test = x[test_idx]
+            self.x_train = x[train_idx]
+            self.x_test = x[test_idx]
 
-        self.y_train = classes_int[train_idx].astype(int)
-        self.y_test = classes_int[test_idx].astype(int)
+            self.y_train = classes_int[train_idx].astype(int)
+            self.y_test = classes_int[test_idx].astype(int)
 
-        self.norm_train = self.normFactor[train_idx]
-        self.norm_test = self.normFactor[test_idx]
-
-        train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
-        self.x_val = self.x_train[val_idx]
-        self.y_val = self.y_train[val_idx]
-        self.norm_val = self.norm_train[val_idx]
-        self.x_train = self.x_train[train_idx]
-        self.y_train = self.y_train[train_idx]
-        self.norm_train = self.norm_train[train_idx]
+            train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
+            self.x_val = self.x_train[val_idx]
+            self.y_val = self.y_train[val_idx]
+            self.x_train = self.x_train[train_idx]
+            self.y_train = self.y_train[train_idx]
+            
+            self.data = x
         
-        self.data = x
+            self.max = np.max(self.x_train)
+            self.min = np.min(self.x_train)
+        else:
+            self.x_train = x
+            self.x_test = None
+            self.x_eval = None
+            self.y_train = classes_int
+            self.y_test = None
+            self.y_eval = None
+            self.max = np.max(self.x_train)
+            self.min = np.min(self.x_train)
 
-        self.max = np.max(self.x_train)
-        self.min = np.min(self.x_train)
 
         self._autocuda = True
 

@@ -14,7 +14,7 @@ _ = torch.manual_seed(1234)
 
 
 conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions.csv'
-dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/trainingData_oldAgSpeModel/"
+dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/trainingData/"
 saveFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
 myCondition = pd.read_csv(conditionPath, header=None)
@@ -41,13 +41,18 @@ for cdt in myCondition:
     sizeFC = int(cdt[10])
     dropout = float(cdt[11])
     customLoss =  int(cdt[12]) == 1
+    xyDisplacement = int(cdt[13]) == 1
 
-    print(f"NumberModel = {modelNum}/{len(myCondition)}, Dataset = {whichDataset}, Displacement = {whichDisplacement}, Replace Nan by mean = {whichReplaceNan}, Remove Mean = {whichRemoveMean}, FFT = {whichFFT} \n #RNN = {numRNN}, size RNN = {sizeRNN}, bidirectional = {bidir}, #FC = {numFC}, size FC = {sizeFC}, dropout = {dropout}")
+
+    
 
     done = np.load(Path(saveFolder) / 'done.npy')
     if np.isin(done,modelNum).any():
         print("Already trained")
     else:
+
+        print(f"NumberModel = {modelNum}/{len(myCondition)}, Dataset = {whichDataset}, Displacement = {whichDisplacement},  Displacement as XY = {xyDisplacement}, Replace Nan by mean = {whichReplaceNan}, Remove Mean = {whichRemoveMean}, FFT = {whichFFT} \n #RNN = {numRNN}, size RNN = {sizeRNN}, bidirectional = {bidir}, #FC = {numFC}, size FC = {sizeFC}, dropout = {dropout}")
+
         # create model folder
         thisPath = Path(saveFolder + modelNum)
         thisPath.mkdir(parents=True, exist_ok=True)
@@ -67,7 +72,10 @@ for cdt in myCondition:
 
         if whichDisplacement:
             csv_pos_path = dataFolder + "position.csv"
-            position_to_displacement = True
+            if xyDisplacement:
+                position_to_displacement = False
+            else:
+                position_to_displacement = True
         else:
             csv_pos_path = None
             position_to_displacement = False
@@ -111,10 +119,10 @@ for cdt in myCondition:
         # Setup training
         n_epochs = 500
         criterion = None
-        D = torch.tensor([[1,2,3,4], 
-            [3,1,4,2],
-            [4,3,1,2],
-            [3,2,3,1]]).to("cuda")
+        D = torch.tensor([  [1,2,3,4], 
+                            [3,1,4,2],
+                            [4,3,1,2],
+                            [3,2,3,1]]).to("cuda")
         
         if customLoss:
             criterion = myCustomCriterion(weight = dataset.weights, device = "cuda", D = D)
@@ -195,7 +203,7 @@ print(f"NumberModel = {myCondition[bestModel][0]}, Dataset = {myCondition[bestMo
 
 ##
 allCustomAccuracy = pd.read_csv(conditionPath)
-allCustomAccuracy = allCustomAccuracy.iloc[:, 17]
+allCustomAccuracy = allCustomAccuracy.iloc[:, myLegend == "Custom_Acc"].to_numpy()
 bestModel = np.argmax(allCustomAccuracy)
 bestAccuracy = np.max(allCustomAccuracy)
 
