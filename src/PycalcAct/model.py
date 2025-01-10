@@ -169,7 +169,7 @@ class MixedFCTemporalModel(nn.Module):
 
         self.final_layer = nn.Linear(fc_hidden_size, n_classes)
 
-    def forward(self, x):
+    def forward(self, x): 
         x, hiddens = self.rnn(x)
         if self.pooling == "max":
             x = torch.max(x, 1)[0]
