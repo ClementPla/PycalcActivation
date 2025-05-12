@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -11,9 +13,9 @@ from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
 
-conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions.csv'
-dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/testingData/"
-modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+conditionPath = 'D:/Sebastien/PycalcActivation/trainingOptions.csv'
+dataFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+modelsFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
@@ -162,7 +164,7 @@ for cdt in myCondition[209:]:
         thisMetric = thisMetric*thisWeigths[:,None]
         thisMetric = np.sum(thisMetric, axis = None)
 
-        # save netric to file
+        # save metric to file
         myFile = pd.read_csv(conditionPath, header=None)
         myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Testing_Metric"] = f"{thisMetric:.4f}"
         myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
