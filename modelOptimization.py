@@ -13,9 +13,9 @@ _ = torch.manual_seed(1234)
 
 
 
-conditionPath = 'D:/Sebastien/PycalcActivation/trainingOptions_round2.csv'
-dataFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
-saveFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
+saveFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
@@ -131,7 +131,7 @@ for cdt in myCondition:
             dataset,
             model,
             device="cuda",
-            batch_size=1000,
+            batch_size=2000,
             criterion= criterion
         )  # You can pass your own optimizer, criterion, learning rate, weight decay and learning rate scheduler.
 

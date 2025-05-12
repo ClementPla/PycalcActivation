@@ -203,7 +203,6 @@ class Dataset:
             self.max = np.max(self.x_train)
             self.min = np.min(self.x_train)
 
-
         self._autocuda = True
 
     def drop_features(self, index):
