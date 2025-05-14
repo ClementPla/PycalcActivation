@@ -3,6 +3,7 @@ from functools import partial
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from sklearn.base import is_regressor
 import torch
 import torch.nn.functional as F
 from colorama import Fore, Style
@@ -192,7 +193,10 @@ class Trainer:
             for i in range(0, len(x), batch_size):
                 self.optim.zero_grad()
                 x_batch = x[i : i + batch_size]
-                y_batch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
+                if self.is_regression:
+                    y_batch = y[i : i + batch_size].type(torch.FloatTensor).to(self.device)
+                else:
+                    y_batch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
                 # Take batch size:
 
                 with torch.autocast("cuda"): #torch.cuda.amp.autocast()
@@ -209,7 +213,10 @@ class Trainer:
             table.update("Loss", loss.item(), aggregate="mean", color="blue")
             table.update("Epoch", e)
             if e % val_every == 0:
-                loss, scores = self.eval(xval, yval.type(torch.LongTensor).to(self.device))
+                if self.is_regression:
+                    loss, scores = self.eval(xval, yval.type(torch.FloatTensor).to(self.device))
+                else:
+                    loss, scores = self.eval(xval, yval.type(torch.LongTensor).to(self.device))
                 if scores[self._store_best] > current_best:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
@@ -242,7 +249,10 @@ class Trainer:
 
         for i, (name, callable) in enumerate(zip(["Train", "Val", "Test"], callbacks)):
             x, y = callable(True, to_cuda=True)
-            loss, scores = self.eval(x, y.type(torch.LongTensor).to(self.device))
+            if self.is_regression:
+                loss, scores = self.eval(x, y.type(torch.FloatTensor).to(self.device))
+            else:
+                loss, scores = self.eval(x, y.type(torch.LongTensor).to(self.device))
             axs[i].set_title(
                 f"Accuracy {(name)} {scores['Accuracy'].item():.2%}, Cohen's Kappa {scores['CohenKappa'].item():.1%}"
             )
@@ -268,14 +278,17 @@ class Trainer:
         with torch.no_grad():
             for i in range(0, len(x), batch_size):
                 xbatch = x[i : i + batch_size]
-                ybatch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
+                if self.is_regression:
+                    ybatch = y[i : i + batch_size].type(torch.FloatTensor).to(self.device)
+                else:
+                    ybatch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
 
                 y_pred = self.model(xbatch)
                 loss = self.criterion(y_pred, ybatch)
                 if self.is_regression:
                     # From continuous to categorical
                     # use regression_bounds to define the thresholds
-                    y_pred = torch.bucketize(y_pred, self.regression_bounds)
+                    y_pred = torch.bucketize(y_pred, self.regression_bounds).type(torch.FloatTensor)
                 else:
                     y_pred = torch.softmax(y_pred, dim=1)
                 self.metrics.update(y_pred, ybatch)
@@ -289,7 +302,10 @@ class Trainer:
     def get_loss(self, x, y, average=True):
         self.model.eval()
         with torch.no_grad():
-            y_pred = self.model(x).type(torch.LongTensor).to(self.device)
+            if self.is_regression:
+                y_pred = self.model(x).type(torch.FloatTensor).to(self.device)
+            else:
+                y_pred = self.model(x).type(torch.LongTensor).to(self.device)
             if average:
                 loss = self.criterion(y_pred, y)
             else:

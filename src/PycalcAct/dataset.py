@@ -1,3 +1,4 @@
+from operator import is_
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 
 class FromLegendFileCSV:
-    def __init__(self, csv_path, customFilter):
+    def __init__(self, csv_path, customFilter, is_regression):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
@@ -31,7 +32,19 @@ class FromLegendFileCSV:
         unique_classes = classes.unique()
         self.mapping = {k: v for k, v in enumerate(unique_classes)}
         self.inv_mapping = {v: k for k, v in self.mapping.items()}
-        classes_int = np.asarray(classes.astype("category").cat.codes)
+        
+        if is_regression:
+            APL = [t.split('-')[0] for t in classes]
+            this_dict = {
+                "N4" : np.log10(2.72e-14),
+                "Q4" : np.log10(3.9e-12),
+                "T4" : np.log10(8.43e-10),
+                "Q4H7" : np.log10(4.67e-9)
+            }
+            classes_int = np.asarray([this_dict[apl] for apl in APL])
+        else:
+            classes_int = np.asarray(classes.astype("category").cat.codes)
+
         self.filter = filter_bool
         self.sorting = sorting_indices
         self.n_classes = len(unique_classes)
@@ -44,13 +57,13 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, customFilter):
+    def __init__(self, csv_path, customFilter, is_regression):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter)
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression)
         datas = []
         self.fnames = []
         for p in datapath:
@@ -106,16 +119,18 @@ class Dataset:
         remove_mean=False,
         replace_nan_by_min=True,
         customFilter = None,
-        forEval = False
+        forEval = False,
+        is_regression = False
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression)
         self.forEval = forEval
         self.f = f
         self.features_names = f.features_names
         self.remove_mean = remove_mean
+        self.is_regression = is_regression
         self.position_to_displacement = position_to_displacement
         if csv_pos_path is not None:
             df_pos = pd.read_csv(csv_pos_path, header=None)
@@ -145,7 +160,7 @@ class Dataset:
                 pos_features = np.concatenate((xx, yy), axis=1)
                 self.features_names += ["X", "Y"]
 
-        classes_int = f.classes_int
+        self.classes_int = f.classes_int
         sk = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
         skval = StratifiedShuffleSplit(n_splits=2, test_size=val_size, random_state=seed)
         if f.data.ndim == 2:
@@ -175,14 +190,19 @@ class Dataset:
         self.n_classes = len(f.mapping)
 
         if not forEval:
-            train_idx, test_idx = next(sk.split(x, classes_int))
+            train_idx, test_idx = next(sk.split(x, self.classes_int))
 
             self.x_train = x[train_idx]
             self.x_test = x[test_idx]
 
-            self.y_train = classes_int[train_idx].astype(int)
-            self.y_test = classes_int[test_idx].astype(int)
-
+            if not self.is_regression:
+                self.y_train = self.classes_int[train_idx].astype(int)
+                self.y_test = self.classes_int[test_idx].astype(int)
+            else:
+                self.y_train = self.classes_int[train_idx]
+                self.y_test = self.classes_int[test_idx]
+            
+            
             train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
             self.x_val = self.x_train[val_idx]
             self.y_val = self.y_train[val_idx]
@@ -197,7 +217,7 @@ class Dataset:
             self.x_train = x
             self.x_test = None
             self.x_eval = None
-            self.y_train = classes_int
+            self.y_train = self.classes_int
             self.y_test = None
             self.y_eval = None
             self.max = np.max(self.x_train)
