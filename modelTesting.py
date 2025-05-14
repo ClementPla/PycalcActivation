@@ -1,5 +1,6 @@
 
 
+from cProfile import label
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -13,16 +14,16 @@ from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
 
-conditionPath = 'D:/Sebastien/PycalcActivation/trainingOptions.csv'
-dataFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
-modelsFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
 myCondition = myCondition.iloc[1:,:]
 myCondition = [myCondition.iloc[i,:].to_numpy() for i in range(0, myCondition.shape[0])] 
 
-for cdt in myCondition[209:]:
+for cdt in myCondition: #[209:]
     modelNum = cdt[0]
     whichDataset = cdt[1]
     whichDisplacement = int(cdt[2]) == 1
@@ -84,7 +85,6 @@ for cdt in myCondition[209:]:
             forEval = False
             # Convert the x, y position to a single displacement value (sqrt((x(t+1)-x(t))^2 + (y(t+1)-y(t))^2)
             )
-        
         if whichFFT:
             dataset.create_new_feature_by_operations(lambda x: np.abs(np.fft.fft(x[:, 0])))
             if whichDataset == "indiv":
@@ -135,7 +135,8 @@ for cdt in myCondition[209:]:
             for j in range(len(y_pred_cat.unique())):
                 myHeatmap[i,j] = torch.sum((y == i) & (y_pred_cat == j)).cpu().detach().numpy()
         myHeatmap = myHeatmap[:,[0,1,3,2]]
-        myHeatmap = myHeatmap[[3,6,7,4,5,2,0,1],:]
+        label_order = np.array([7,8,9,4,5,6,14,15,17,16,10,11,12,13,2,3,0,1]);
+        myHeatmap = myHeatmap[label_order,:]
 
         # Visulalize predictions    
         # calculate Z-Score on heatmap 
@@ -145,7 +146,7 @@ for cdt in myCondition[209:]:
         # plot figure
         fig, ax = plt.subplots()
         ax.set_xticks(list(range(len(y_pred_cat.unique()))) ,["N4", "Q4", "T4", "Q4H7"] )
-        ax.set_yticks(list(range(len(y.unique()))) ,['N4', 'Q4', 'T4', 'OT3_N4', 'OT3_Q4', 'M9', 'C9', 'L6F'])
+        ax.set_yticks(list(range(len(y.unique()))) ,np.array(dataset.labels)[label_order])
         ax.imshow(myHeatmap_norm, cmap='RdYlBu', interpolation='nearest')
         for i in range(len(y.unique())):
             for j in range(len(y_pred_cat.unique())):
@@ -154,13 +155,13 @@ for cdt in myCondition[209:]:
 
         # calculate custom metric
         OT1_EC50 = np.log10(np.array([1.4e-17, 3.9e-12, 8.43e-10, 4.67e-9]))
-        testing_EC50 =  np.log10(np.array([1.4e-17, 3.9e-12, 8.43e-10, 5.474e-14, 2.508e-16, 8.995e-13, 3.16e-9 , 9.26e-9]))
+        testing_EC50 =  np.log10(np.array([1.4e-17, 1.4e-17,1.4e-17,1.4e-17,1.4e-17,1.4e-17,3.9e-12, 3.9e-12, 8.43e-10, 4.67e-9, 5.474e-14, 5.474e-14, 2.508e-16,2.508e-16, 8.995e-13,  8.995e-13, 3.16e-9 , 9.26e-9]))
 
         thisCorrection = np.abs(OT1_EC50-testing_EC50[:,None])
         thisMetric = myHeatmap*thisCorrection
         thisMetric = thisMetric/np.sum(myHeatmap)
         thisWeigths = dataset.weights.cpu().detach().numpy()
-        thisWeigths = thisWeigths[[3,6,7,4,5,2,0,1]]
+        thisWeigths = thisWeigths[label_order]
         thisMetric = thisMetric*thisWeigths[:,None]
         thisMetric = np.sum(thisMetric, axis = None)
 

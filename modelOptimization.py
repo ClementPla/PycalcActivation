@@ -203,7 +203,7 @@ print(f"NumberModel = {myCondition[bestModel][0]}, Dataset = {myCondition[bestMo
 
 ##
 allCustomAccuracy = pd.read_csv(conditionPath)
-allCustomAccuracy = allCustomAccuracy.iloc[:, myLegend == "Custom_Acc"].to_numpy()
+allCustomAccuracy = allCustomAccuracy.iloc[:, np.argwhere(myLegend == "Custom_Acc").item()].to_numpy()
 bestModel = np.argmax(allCustomAccuracy)
 bestAccuracy = np.max(allCustomAccuracy)
 
