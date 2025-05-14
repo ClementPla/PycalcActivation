@@ -1,6 +1,4 @@
-
-
-from cProfile import label
+# from cProfile import label
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -14,9 +12,14 @@ from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
 
-conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
-modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+# conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+# dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+# modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+
+conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+modelsFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
@@ -53,13 +56,13 @@ for cdt in myCondition: #[209:]
         customFilter = None
         match whichDataset:
             case "ratio":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio.csv"]          
+                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio.csv"]
             case "ratioNorm":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"] 
+                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"]
             case "indiv":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumFree.csv", dataFolder+"calciumBound.csv"] 
+                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumFree.csv", dataFolder+"calciumBound.csv"]
             case _:
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"] 
+                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"]
                 customFilter = cdt[1]
 
         if whichDisplacement:
@@ -154,8 +157,8 @@ for cdt in myCondition: #[209:]
         # plt.show()
 
         # calculate custom metric
-        OT1_EC50 = np.log10(np.array([1.4e-17, 3.9e-12, 8.43e-10, 4.67e-9]))
-        testing_EC50 =  np.log10(np.array([1.4e-17, 1.4e-17,1.4e-17,1.4e-17,1.4e-17,1.4e-17,3.9e-12, 3.9e-12, 8.43e-10, 4.67e-9, 5.474e-14, 5.474e-14, 2.508e-16,2.508e-16, 8.995e-13,  8.995e-13, 3.16e-9 , 9.26e-9]))
+        OT1_EC50 = np.log10(np.array([2.72e-14, 3.9e-12, 8.43e-10, 4.67e-9]))
+        testing_EC50 =  np.log10(np.array([2.72e-14, 2.72e-14,2.72e-14,2.72e-14,2.72e-14,2.72e-14,3.9e-12, 3.9e-12, 8.43e-10, 4.67e-9, 5.474e-14, 5.474e-14, 2.508e-16,2.508e-16, 8.995e-13,  8.995e-13, 3.16e-9 , 9.26e-9]))
 
         thisCorrection = np.abs(OT1_EC50-testing_EC50[:,None])
         thisMetric = myHeatmap*thisCorrection
@@ -163,6 +166,8 @@ for cdt in myCondition: #[209:]
         thisWeigths = dataset.weights.cpu().detach().numpy()
         thisWeigths = thisWeigths[label_order]
         thisMetric = thisMetric*thisWeigths[:,None]
+        selected_variables = np.array([0,6,8,9,10,12,14,16,17])
+        thisMetric = thisMetric[selected_variables]
         thisMetric = np.sum(thisMetric, axis = None)
 
         # save metric to file
