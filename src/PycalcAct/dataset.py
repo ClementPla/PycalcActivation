@@ -36,10 +36,10 @@ class FromLegendFileCSV:
         if is_regression:
             APL = [t.split('-')[0] for t in classes]
             this_dict = {
-                "N4" : np.log10(2.72e-14),
-                "Q4" : np.log10(3.9e-12),
-                "T4" : np.log10(8.43e-10),
-                "Q4H7" : np.log10(4.67e-9)
+                "N4" : 0,#np.log10(2.72e-14),
+                "Q4" : 1,#np.log10(3.9e-12),
+                "T4" : 2,#np.log10(8.43e-10),
+                "Q4H7" : 3,#np.log10(4.67e-9)
             }
             classes_int = np.asarray([this_dict[apl] for apl in APL])
         else:
