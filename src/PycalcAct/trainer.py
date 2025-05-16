@@ -284,11 +284,14 @@ class Trainer:
                     ybatch = y[i : i + batch_size].type(torch.LongTensor).to(self.device)
 
                 y_pred = self.model(xbatch)
+                if self.is_regression:
+                    y_pred = y_pred.squeeze()
                 loss = self.criterion(y_pred, ybatch)
                 if self.is_regression:
                     # From continuous to categorical
                     # use regression_bounds to define the thresholds
-                    y_pred = torch.bucketize(y_pred, self.regression_bounds).type(torch.FloatTensor)
+                    y_pred = torch.bucketize(y_pred, self.regression_bounds).type(torch.FloatTensor).to(self.device)
+                    ybatch = torch.bucketize(ybatch, self.regression_bounds).to(self.device)
                 else:
                     y_pred = torch.softmax(y_pred, dim=1)
                 self.metrics.update(y_pred, ybatch)
