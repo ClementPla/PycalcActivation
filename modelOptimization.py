@@ -17,9 +17,14 @@ _ = torch.manual_seed(1234)
 # dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
 # saveFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
-conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
-saveFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+# conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+# dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
+# saveFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+
+conditionPath = 'D:/sebastien/PycalcActivation/trainingOptions_round2.csv'
+dataFolder = "D:/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
+saveFolder = "D:/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]

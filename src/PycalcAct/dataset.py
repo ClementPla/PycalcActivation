@@ -38,10 +38,11 @@ class FromLegendFileCSV:
             this_dict = {
                 "N4" : 0,#np.log10(2.72e-14),
                 "Q4" : 1,#np.log10(3.9e-12),
-                "T4" : 2,#np.log10(8.43e-10),
-                "Q4H7" : 3,#np.log10(4.67e-9)
+                "Q4H7" : 2,#np.log10(4.67e-9),
+                "T4" : 3,#np.log10(8.43e-10),
             }
             classes_int = np.asarray([this_dict[apl] for apl in APL])
+            # self.mapping = {0: 'N4-6', 1: 'Q4-6', 2: 'T4-6', 3: 'Q4H7-6'}
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
 
@@ -255,7 +256,6 @@ class Dataset:
     @property
     def weights(self):
         class_weights = compute_class_weight("balanced", classes=np.unique(self.y_train), y=self.y_train)
-
         return torch.from_numpy(class_weights).float()
 
     def __repr__(self):

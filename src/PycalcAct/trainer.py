@@ -13,7 +13,7 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import Accuracy, CohenKappa, ConfusionMatrix
 
 from PycalcAct.utils.wrapper import on_keyboard_interrup
-
+from PycalcAct.myCustomCriterion import myMSELoss
 
 class Trainer:
     def __init__(
@@ -71,7 +71,10 @@ class Trainer:
 
     def default_criterion(self):
         if self.is_regression:
-            return torch.nn.MSELoss()
+            if self.use_class_weights:
+                return myMSELoss(weights=self.dataset.weights)
+            else:
+                return torch.nn.MSELoss()
         else:
             if self.use_class_weights:
                 return torch.nn.CrossEntropyLoss(weight=self.dataset.weights).to(self.device)
@@ -201,6 +204,9 @@ class Trainer:
 
                 with torch.autocast("cuda"): #torch.cuda.amp.autocast()
                     y_pred = self.model(x_batch)
+                    if self.is_regression:
+                        y_pred = y_pred.squeeze()
+                        y_batch = y_batch.squeeze()
                     loss = self.criterion(y_pred, y_batch)
                 
                 loss.backward()
