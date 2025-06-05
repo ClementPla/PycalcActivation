@@ -37,10 +37,10 @@ class myMSELoss:
     def forward(self, input: Tensor, target: Tensor, weights: Tensor) -> Tensor:
         weight_list = target.tolist()
         weight_dict = {
-            0 : weights[0],
-            1 : weights[1],
-            2 : weights[2],
-            3 : weights[3],
+            0 : weights[0]**2,
+            1 : weights[1]**2,
+            2 : weights[2]**2,
+            3 : weights[3]**2,
             }
         weight_list = torch.Tensor([weight_dict[y] for y in weight_list]).to(input.device)
         return F.mse_loss(input.squeeze(), target, reduction=self.reduction, weight=weight_list)
