@@ -9,7 +9,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 
 class FromLegendFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression,augment_gt):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
@@ -19,38 +19,53 @@ class FromLegendFileCSV:
         col_activated = 2
         col_classesAPL = 6
         col_customFilter = 8
+        col_user = 10
         myDay = pd.DataFrame([d[0:8] for d in df[col_customFilter]])
         if customFilter == None:
-            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_user] == "ST") & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
         else:
-            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & (df[col_classesAPL] != " ") & (myDay[0] != customFilter)).values
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_user] == "ST") & (df[col_activated] == 1) & (df[col_classesAPL] != " ") & (myDay[0] != customFilter)).values
         df = df[filter_bool]
         sorting_indices = df[col_classesAPL].argsort()
 
         df = df.iloc[sorting_indices]
         classes = df.iloc[:, col_classesAPL]
         unique_classes = classes.unique()
-        self.mapping = {k: v for k, v in enumerate(unique_classes)}
-        self.inv_mapping = {v: k for k, v in self.mapping.items()}
-        
+        self.mapping = {0: 'N4-6', 1: 'Q4-6', 2: 'T4-6', 3: 'Q4H7-6'}
+        self.inv_mapping = {'N4-6': 0, 'Q4-6': 1, 'T4-6': 2, 'Q4H7-6': 3}
+        # self.mapping = {k: v for k, v in enumerate(unique_classes)}
+        # self.inv_mapping = {v: k for k, v in self.mapping.items()}
+        self.data = df.iloc[:, -120:].values
+        scaling_factor = 0.4
         if is_regression:
             APL = [t.split('-')[0] for t in classes]
             this_dict = {
                 "N4" : 0,#np.log10(2.72e-14),
                 "Q4" : 1,#np.log10(3.9e-12),
-                "Q4H7" : 2,#np.log10(4.67e-9),
-                "T4" : 3,#np.log10(8.43e-10),
+                "T4" : 2,#np.log10(8.43e-10),
+                "Q4H7" : 3,#np.log10(4.67e-9),
+                
             }
             classes_int = np.asarray([this_dict[apl] for apl in APL])
-            # self.mapping = {0: 'N4-6', 1: 'Q4-6', 2: 'T4-6', 3: 'Q4H7-6'}
+            if augment_gt == "rand":
+                classes_int = [t+(0.5-np.random.rand())*scaling_factor for t in classes_int]
+            elif augment_gt == "Ca":
+                thisData = self.data
+                meanCa = np.mean(thisData,2)
+                classes_int = classes_int - (meanCa.squeeze()-min(meanCa))/(max(meanCa))-min(meanCa)*scaling_factor
+
+                ## change mapping
+                
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
+            
 
         self.filter = filter_bool
         self.sorting = sorting_indices
         self.n_classes = len(unique_classes)
-        self.data = df.iloc[:, -120:].values
+        
         self.classes_int = classes_int
+        self.classes = classes
 
     @property
     def features_names(self):
@@ -58,13 +73,13 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression, augment_gt):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression)
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, augment_gt)
         datas = []
         self.fnames = []
         for p in datapath:
@@ -121,14 +136,16 @@ class Dataset:
         replace_nan_by_min=True,
         customFilter = None,
         forEval = False,
-        is_regression = False
+        is_regression = False,
+        augment_gt = False
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter, is_regression)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression,augment_gt)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter, is_regression)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression, augment_gt)
         self.forEval = forEval
         self.f = f
+        self.augment_gt = augment_gt
         self.features_names = f.features_names
         self.remove_mean = remove_mean
         self.is_regression = is_regression

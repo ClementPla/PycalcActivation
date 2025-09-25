@@ -1,3 +1,4 @@
+from argparse import _ArgumentGroup
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
@@ -30,7 +31,9 @@ class Trainer:
         batch_size=32,
         is_regression=False,
         use_class_weights=True,
-        regression_bounds=None,
+        regression_bounds_y=None,
+        regression_bounds_y_pred=None,
+        augment_gt = False,
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -44,9 +47,9 @@ class Trainer:
         self.optim = optim if optim else self.default_optimizer()
         self.criterion = criterion if criterion else self.default_criterion()
         self.scheduler = scheduler
-
-        self.regression_bounds = regression_bounds
-
+        self.augment_gt = augment_gt
+        self.regression_bounds_y = regression_bounds_y
+        self.regression_bounds_y_pred = regression_bounds_y_pred
         self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
         self._initial_state_dict = deepcopy(self.model.state_dict())
         self._store_best = store_best
@@ -75,6 +78,8 @@ class Trainer:
                 return myMSELoss(weights=self.dataset.weights)
             else:
                 return torch.nn.MSELoss()
+                # return torch.nn.L1Loss()
+                # return torch.nn.HuberLoss()
         else:
             if self.use_class_weights:
                 return torch.nn.CrossEntropyLoss(weight=self.dataset.weights).to(self.device)
@@ -296,8 +301,8 @@ class Trainer:
                 if self.is_regression:
                     # From continuous to categorical
                     # use regression_bounds to define the thresholds
-                    y_pred = torch.bucketize(y_pred, self.regression_bounds).type(torch.FloatTensor).to(self.device)
-                    ybatch = torch.bucketize(ybatch, self.regression_bounds).to(self.device)
+                    y_pred = torch.bucketize(y_pred, self.regression_bounds_y_pred).type(torch.FloatTensor).to(self.device)
+                    ybatch = torch.bucketize(ybatch, self.regression_bounds_y).to(self.device)
                 else:
                     y_pred = torch.softmax(y_pred, dim=1)
                 self.metrics.update(y_pred, ybatch)
@@ -400,5 +405,6 @@ class Trainer:
             "batch_size": self.batch_size,
             "is_regression": self.is_regression,
             "use_class_weights": self.use_class_weights,
-            "regression_bounds": self.regression_bounds,
+            "regression_bounds_y": self.regression_bounds_y,
+            "regression_bounds_y_pred": self.regression_bounds_y_pred,
         }
