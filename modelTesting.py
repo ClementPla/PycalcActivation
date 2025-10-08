@@ -12,13 +12,13 @@ from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
 
-# conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-# dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
-# modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+modelsFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
-conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
-modelsFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+# conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
+# dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/testingData/"
+# modelsFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
 
 myCondition = pd.read_csv(conditionPath, header=None)
@@ -26,7 +26,7 @@ myLegend = myCondition.iloc[0,:]
 myCondition = myCondition.iloc[1:,:]
 myCondition = [myCondition.iloc[i,:].to_numpy() for i in range(0, myCondition.shape[0])] 
 
-for cdt in myCondition: #[209:]
+for cdt in myCondition[125:]: #[209:]
     modelNum = cdt[0]
     whichDataset = cdt[1]
     whichDisplacement = int(cdt[2]) == 1
