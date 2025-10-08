@@ -1,4 +1,5 @@
 import numpy as np
+from sympy import Q
 import torch
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,6 +11,7 @@ from PycalcAct.calculateCustomAccuracy import calculateCustomAccuracy
 from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
+from scipy.stats import f_oneway
 
 
 
@@ -21,9 +23,9 @@ _ = torch.manual_seed(1234)
 # dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
 # saveFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
 
-conditionPath = 'D:/sebastien/PycalcActivation/trainingOptions_round2.csv'
-dataFolder = "D:/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
-saveFolder = "D:/Ca2-Analysis_McGill/prediction/agAffinity/models/"
+conditionPath = 'D:/sebastien/PycalcActivation/trainingOptions_round3.csv'
+dataFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill/"
+saveFolder = "D:/sebastien/PycalcActivation/models/round3/"
 
 
 myCondition = pd.read_csv(conditionPath, header=None)
@@ -49,11 +51,11 @@ for cdt in myCondition:
     numFC = int(cdt[9])
     sizeFC = int(cdt[10])
     dropout = float(cdt[11])
-    customLoss =  int(cdt[12]) == 1
-    xyDisplacement = int(cdt[13]) == 1
-
-
-    
+    weighted = int(cdt[8]) == 1
+    customLoss =  int(cdt[13]) == 1
+    xyDisplacement = int(cdt[14]) == 1
+    is_regression = int(cdt[15]) == 1
+    augment_gt = cdt[16]
 
     done = np.load(Path(saveFolder) / 'done.npy')
     if np.isin(done,modelNum).any():
@@ -92,6 +94,18 @@ for cdt in myCondition:
         replace_nan_by_min = True if whichReplaceNan else False
         remove_mean = True if whichRemoveMean else False
         
+        if is_regression:
+            regression_bounds_y = [-12,-10,-9]
+            regression_bounds_y_pred = [-12,-10,-9]
+            weighted = False
+        else:
+            regression_bounds_y = None
+            regression_bounds_y_pred = None
+
+        if augment_gt == "N":
+            augment_gt = None
+        else:
+            augment_gt = "Ca"
 
         dataset = Dataset(
             csv_path = csv_path,
@@ -99,7 +113,10 @@ for cdt in myCondition:
             position_to_displacement=position_to_displacement,
             remove_mean=remove_mean,
             replace_nan_by_min=replace_nan_by_min,
-            customFilter = customFilter
+            customFilter = customFilter, 
+            is_regression=False, #True,
+            augment_gt = augment_gt,
+            forEval = False,
             # Convert the x, y position to a single displacement value (sqrt((x(t+1)-x(t))^2 + (y(t+1)-y(t))^2)
             )
         
@@ -141,9 +158,11 @@ for cdt in myCondition:
             model,
             device="cuda",
             batch_size=2000,
-            criterion= criterion
-        )  # You can pass your own optimizer, criterion, learning rate, weight decay and learning rate scheduler.
-
+            criterion= criterion,
+            use_class_weights= weighted,
+            regression_bounds_y = regression_bounds_y,
+            regression_bounds_y_pred = regression_bounds_y_pred
+        )  
         # train model
         trainer.train(n_epochs)
         # trainer.test("best")
@@ -168,8 +187,10 @@ for cdt in myCondition:
         narr = np.array([metrics['Accuracy'].tolist(), metrics['CohenKappa'].tolist()])
         np.savetxt(thisPath / 'MetricsValue.csv', narr, delimiter=",")
 
-        # save confusion matrix
+        # save figure
+        fig.savefig(thisPath / 'confusionMatrix.pdf')
 
+        # save confusion matrix
         thisConfmat =  trainer.confmat.compute()
         thisConfmat = np.array(thisConfmat.cpu(), dtype = str)   
         labels=np.array(trainer.dataset.labels, dtype = str)
@@ -178,18 +199,38 @@ for cdt in myCondition:
         np.savetxt(thisPath / 'confusionMatrix.csv', writeConfmat, delimiter=",", fmt='%s')
 
         # update allCondition file.
-        accuracy_N4, accuracy_Q4, accuracy_T4, accuracy_Q4H7, customAcc = calculateCustomAccuracy(thisConfmat)
-        myFile = pd.read_csv(conditionPath, header=None)
-        myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Accuracy"] = f"{metrics['Accuracy']:.4f}"
-        myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = f"{accuracy_N4:.4f}"
-        myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4_Acc"] = f"{accuracy_Q4:.4f}"
-        myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = f"{accuracy_T4:.4f}"
-        myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4H7_Acc"] = f"{accuracy_Q4H7:.4f}"
-        myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{customAcc:.4f}"
-        myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
-        # save figure
-        fig.savefig(thisPath / 'confusionMatrix.pdf')
+        if not is_regression:
+            accuracy_N4, accuracy_Q4, accuracy_T4, accuracy_Q4H7, customAcc = calculateCustomAccuracy(thisConfmat)
+            myFile = pd.read_csv(conditionPath, header=None)
+            myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Accuracy"] = f"{metrics['Accuracy']:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = f"{accuracy_N4:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4_Acc"] = f"{accuracy_Q4:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = f"{accuracy_T4:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4H7_Acc"] = f"{accuracy_Q4H7:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{customAcc:.4f}"
+            myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
+        else:
+            x, y = trainer.dataset.test_batch(True, to_cuda=True)
+            y_pred = trainer.model(torch.Tensor(x))
+            f_statistic, p_value = f_oneway(y_pred[y == np.log10(2.28e-13)].cpu().detach().numpy(), 
+                                    y_pred[y == np.log10(7.37e-11)].cpu().detach().numpy(), 
+                                    y_pred[y == np.log10(4.76e-10)].cpu().detach().numpy(),
+                                    y_pred[y == np.log10(2.46e-9)].cpu().detach().numpy())
+            myFile = pd.read_csv(conditionPath, header=None)
+            myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Accuracy"] = f"{metrics['Accuracy']:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = ""
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4_Acc"] = ""
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = ""
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4H7_Acc"] = ""
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{f_statistic:.4f}"
+            myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
 
+            plt.hist(y_pred[y == np.log10(2.28e-13)].cpu().detach().numpy(), 50)
+            plt.hist(y_pred[y == np.log10(7.37e-11)].cpu().detach().numpy(), 50)
+            plt.hist(y_pred[y == np.log10(4.76e-10),].cpu().detach().numpy(), 50)
+            plt.hist(y_pred[y == np.log10(2.46e-9),].cpu().detach().numpy(), 50)
+            plt.savefig(thisPath / 'predictionDistribution.pdf')
+            
         done = np.append(done, modelNum)
         np.save(Path(saveFolder) / 'done.npy', done)
 

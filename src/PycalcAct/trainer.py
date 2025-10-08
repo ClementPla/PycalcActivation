@@ -33,7 +33,6 @@ class Trainer:
         use_class_weights=True,
         regression_bounds_y=None,
         regression_bounds_y_pred=None,
-        augment_gt = False,
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -47,7 +46,7 @@ class Trainer:
         self.optim = optim if optim else self.default_optimizer()
         self.criterion = criterion if criterion else self.default_criterion()
         self.scheduler = scheduler
-        self.augment_gt = augment_gt
+
         self.regression_bounds_y = regression_bounds_y
         self.regression_bounds_y_pred = regression_bounds_y_pred
         self._initial_optim_state_dict = deepcopy(self.optim.state_dict())

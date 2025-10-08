@@ -17,44 +17,59 @@ class FromLegendFileCSV:
 
         col_ageSpe = 0
         col_activated = 2
+        col_peptide = 5
         col_classesAPL = 6
-        col_customFilter = 8
-        col_user = 10
-        myDay = pd.DataFrame([d[0:8] for d in df[col_customFilter]])
+        col_conc = 7
+        col_CTFR = 8
+        col_customFilter = 10
+        col_user = 11
+        scaling_factor = 0.4
+        this_dict = {
+                "N4" : np.log10(2.28e-13),
+                "Q4" : np.log10(7.37e-11),
+                "T4" : np.log10(4.76e-10),
+                "Q4H7" : np.log10(2.46e-9),
+                "M9" : np.log10(2.64e-12),
+                "L6F" : np.log10(1e-8),
+                "C9" : np.log10(5.29e-8),
+                "OT3_N4" : np.log10(2.34e-11),
+                "OT3_Q4" : np.log10(3.92e-12),
+            }
+
+        myDay = pd.DataFrame([d for d in df[col_customFilter]])
         if customFilter == None:
-            filter_bool = ((df[col_ageSpe] == 1) & (df[col_user] == "ST") & (df[col_activated] == 1) & (df[col_classesAPL] != " ")).values
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
+                           (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
+                           (df[col_CTFR] != "OT3-CTFR")& (df[col_user] == "ST")).values
         else:
-            filter_bool = ((df[col_ageSpe] == 1) & (df[col_user] == "ST") & (df[col_activated] == 1) & (df[col_classesAPL] != " ") & (myDay[0] != customFilter)).values
+            filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
+                           (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
+                           (df[col_CTFR] != "OT3-CTFR")& (df[col_user] == "ST") & 
+                           (myDay[0] != customFilter)).values
+            
         df = df[filter_bool]
         sorting_indices = df[col_classesAPL].argsort()
-
         df = df.iloc[sorting_indices]
         classes = df.iloc[:, col_classesAPL]
         unique_classes = classes.unique()
-        self.mapping = {0: 'N4-6', 1: 'Q4-6', 2: 'T4-6', 3: 'Q4H7-6'}
-        self.inv_mapping = {'N4-6': 0, 'Q4-6': 1, 'T4-6': 2, 'Q4H7-6': 3}
-        # self.mapping = {k: v for k, v in enumerate(unique_classes)}
-        # self.inv_mapping = {v: k for k, v in self.mapping.items()}
-        self.data = df.iloc[:, -120:].values
-        scaling_factor = 0.4
-        if is_regression:
-            APL = [t.split('-')[0] for t in classes]
-            this_dict = {
-                "N4" : 0,#np.log10(2.72e-14),
-                "Q4" : 1,#np.log10(3.9e-12),
-                "T4" : 2,#np.log10(8.43e-10),
-                "Q4H7" : 3,#np.log10(4.67e-9),
-                
-            }
-            classes_int = np.asarray([this_dict[apl] for apl in APL])
-            if augment_gt == "rand":
-                classes_int = [t+(0.5-np.random.rand())*scaling_factor for t in classes_int]
-            elif augment_gt == "Ca":
-                thisData = self.data
-                meanCa = np.mean(thisData,2)
-                classes_int = classes_int - (meanCa.squeeze()-min(meanCa))/(max(meanCa))-min(meanCa)*scaling_factor
 
-                ## change mapping
+        # self.inv_mapping = {key: value for key, value in this_dict.items() if key in unique_classes}
+        # self.mapping = {v: k for k, v in self.inv_mapping.items()}
+        
+        # self.mapping = {k: v for k, v in enumerate(unique_classes)}
+        self.mapping = {0: 'N4', 1: 'Q4', 2: 'T4', 3: 'Q4H7'}
+        self.inv_mapping = {v: k for k, v in self.mapping.items()}
+
+        self.data = df.iloc[:, -120:].values
+        if is_regression:
+            classes_int = np.asarray([this_dict[apl] for apl in classes])
+            # if augment_gt == "rand":
+            #     classes_int = [t+(0.5-np.random.rand())*scaling_factor for t in classes_int]
+            # elif augment_gt == "Ca":
+            #     thisData = self.data
+            #     meanCa = np.mean(thisData,2)
+            #     classes_int = classes_int - (meanCa.squeeze()-min(meanCa))/(max(meanCa))-min(meanCa)*scaling_factor
+            #       ## change mapping
                 
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
