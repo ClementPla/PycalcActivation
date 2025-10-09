@@ -12,30 +12,28 @@ from pathlib import Path
 from PycalcAct.myCustomCriterion import myCustomCriterion
 _ = torch.manual_seed(1234)
 from scipy.stats import f_oneway
+from socket import gethostname
 
 
+if gethostname() == 'HM_Lab':
+    conditionPath = Path("D:/sebastien/PycalcActivation/trainingOptions_round3.csv")
+    dataFolder = Path("D:/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
+    saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
+elif gethostname() == 'Hmr_lymph':
+    conditionPath = Path('D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv')
+    dataFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData")
+    saveFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models")
+elif gethostname() == 'HMR_BLOOD':
+    conditionPath = Path('D:/Sebastien/PycalcActivation/trainingOptions_round3.csv')
+    dataFolder = Path("D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
+    saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
 
-# conditionPath = 'D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-# dataFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
-# saveFolder = "D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
-
-# conditionPath = '//Hmr_lymph/d/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv'
-# dataFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData/"
-# saveFolder = "//Hmr_lymph/d/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models/"
-
-conditionPath = 'D:/sebastien/PycalcActivation/trainingOptions_round3.csv'
-dataFolder = "D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill/"
-saveFolder = "D:/sebastien/PycalcActivation/models/round3/"
 
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
 myCondition = myCondition.iloc[1:,:]
 myCondition = [myCondition.iloc[i,:].to_numpy() for i in range(0, myCondition.shape[0])] 
-
-done = np.array([])
-
-
 
 for cdt in myCondition:
     # Load training conditions
@@ -57,7 +55,12 @@ for cdt in myCondition:
     is_regression = int(cdt[15]) == 1
     augment_gt = cdt[16]
 
-    done = np.load(Path(saveFolder) / 'done.npy')
+    donePath = saveFolder.joinpath('done.npy')
+    if donePath.exists():
+        done = np.load(donePath)
+    else:
+        done = np.array()
+        
     if np.isin(done,modelNum).any():
         print("Already trained")
     else:
@@ -65,24 +68,24 @@ for cdt in myCondition:
         print(f"NumberModel = {modelNum}/{len(myCondition)}, Dataset = {whichDataset}, Displacement = {whichDisplacement},  Displacement as XY = {xyDisplacement}, Replace Nan by mean = {whichReplaceNan}, Remove Mean = {whichRemoveMean}, FFT = {whichFFT} \n #RNN = {numRNN}, size RNN = {sizeRNN}, bidirectional = {bidir}, #FC = {numFC}, size FC = {sizeFC}, dropout = {dropout}")
 
         # create model folder
-        thisPath = Path(saveFolder + modelNum)
+        thisPath = saveFolder.joinpath(modelNum)
         thisPath.mkdir(parents=True, exist_ok=True)
             
         # Setup Dataset
         customFilter = None
         match whichDataset:
             case "ratio":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio.csv"]          
+                csv_path=[dataFolder.joinpath("legend.csv"), dataFolder.joinpath("calciumRatio.csv")]          
             case "ratioNorm":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"] 
+                csv_path=[dataFolder.joinpath("legend.csv"), dataFolder.joinpath("calciumRatio_normalized.csv")] 
             case "indiv":
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumFree.csv", dataFolder+"calciumBound.csv"] 
+                csv_path=[dataFolder.joinpath("legend.csv"), dataFolder.joinpath("calciumFree.csv"), dataFolder.joinpath("calciumBound.csv")] 
             case _:
-                csv_path=[dataFolder + "legend.csv", dataFolder+"calciumRatio_normalized.csv"] 
+                csv_path=[dataFolder.joinpath("legend.csv"), dataFolder.joinpath("calciumRatio_normalized.csv")] 
                 customFilter = cdt[1]
 
         if whichDisplacement:
-            csv_pos_path = dataFolder + "position.csv"
+            csv_pos_path = dataFolder.joinpath("position.csv")
             if xyDisplacement:
                 position_to_displacement = False
             else:
@@ -210,29 +213,45 @@ for cdt in myCondition:
             myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{customAcc:.4f}"
             myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
         else:
-            x, y = trainer.dataset.test_batch(True, to_cuda=True)
-            y_pred = trainer.model(torch.Tensor(x))
-            f_statistic, p_value = f_oneway(y_pred[y == np.log10(2.28e-13)].cpu().detach().numpy(), 
-                                    y_pred[y == np.log10(7.37e-11)].cpu().detach().numpy(), 
-                                    y_pred[y == np.log10(4.76e-10)].cpu().detach().numpy(),
-                                    y_pred[y == np.log10(2.46e-9)].cpu().detach().numpy())
+            
             myFile = pd.read_csv(conditionPath, header=None)
             myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Accuracy"] = f"{metrics['Accuracy']:.4f}"
-            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = ""
-            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4_Acc"] = ""
-            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = ""
-            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4H7_Acc"] = ""
-            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{f_statistic:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = f"{metrics_last['Accuracy']:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Q4_Acc"] = f"{metrics['myFScore']:.4f}"
+            myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = f"{metrics_last['myFScore']:.4f}"
             myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
 
-            plt.hist(y_pred[y == np.log10(2.28e-13)].cpu().detach().numpy(), 50)
-            plt.hist(y_pred[y == np.log10(7.37e-11)].cpu().detach().numpy(), 50)
-            plt.hist(y_pred[y == np.log10(4.76e-10),].cpu().detach().numpy(), 50)
-            plt.hist(y_pred[y == np.log10(2.46e-9),].cpu().detach().numpy(), 50)
-            plt.savefig(thisPath / 'predictionDistribution.pdf')
+            x_test, y_test = trainer.dataset.test_batch(True, to_cuda=True)
+            x_train, y_train = trainer.dataset.train_batch(True, to_cuda=True)
+            
+            all_classes = np.unique(y_train.cpu().numpy())
+
+            trainer.load_best()
+            y_pred_train = trainer.model(torch.Tensor(x_train))
+            y_pred_test = trainer.model(torch.Tensor(x_test))
+            fig, [ax, ax1] = plt.subplots(1,2)
+            for cls in all_classes:
+                ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
+                ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
+            ax.title.set_text('train dataset')
+            ax1.title.set_text('test dataset')
+            fig.suptitle('Best Model') 
+            plt.savefig(thisPath / 'predictionDistribution_best.pdf')
+            trainer.load_last()
+            y_pred_train = trainer.model(torch.Tensor(x_train))
+            y_pred_test = trainer.model(torch.Tensor(x_test))
+            fig, [ax, ax1] = plt.subplots(1,2)
+            for cls in all_classes:
+                ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
+                ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
+            ax.title.set_text("train dataset")
+            ax1.title.set_text("test dataset")
+            fig.suptitle('Last Model') 
+            plt.savefig(thisPath / 'predictionDistribution_last.pdf')
+            
             
         done = np.append(done, modelNum)
-        np.save(Path(saveFolder) / 'done.npy', done)
+        np.save(saveFolder.joinpath('done.npy'), done)
 
         # print current metrics
         print(f"Model {modelNum} - Accuracy: {metrics['Accuracy']:.4f} \n\n\n")
@@ -242,7 +261,7 @@ for cdt in myCondition:
 ##
 allAccuracy = np.array([])
 for i in range(0,len(myCondition)):
-    temp = pd.read_csv(Path(saveFolder)/str(i+1)/"MetricsValue.csv", header=None)
+    temp = pd.read_csv(saveFolder.joinpath(str(i+1),"MetricsValue.csv"), header=None)
     allAccuracy = np.append(allAccuracy, temp.iloc[0])
     
 bestModel = np.argmax(allAccuracy)

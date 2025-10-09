@@ -2,6 +2,9 @@ from sklearn.feature_selection import SelectFdr
 import torch
 import torch.nn.functional as F
 from torch import Tensor
+from torchmetrics import Metric
+import numpy as np
+from scipy.stats import f_oneway
 
 class myCustomCriterion:
     def __init__(
@@ -29,21 +32,45 @@ class myCustomCriterion:
         return self.forward(input, target)
     
 class myMSELoss:
-    def __init__(self, size_average=None, reduce=None, reduction: str = "mean", weights=None):
+    def __init__(self, size_average=None, reduce=None, reduction: str = "mean", weights=None, classes=None):
+        super().__init__()
         self.size_average = size_average
         self.reduce = reduce
         self.reduction = reduction
         self.weights = weights
-    def forward(self, input: Tensor, target: Tensor, weights: Tensor) -> Tensor:
+        self.classes = classes
+
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
         weight_list = target.tolist()
-        weight_dict = {
-            0 : weights[0]**2,
-            1 : weights[1]**2,
-            2 : weights[2]**2,
-            3 : weights[3]**2,
-            }
-        weight_list = torch.Tensor([weight_dict[y] for y in weight_list]).to(input.device)
+        weight_dict = {i: self.weights[int(k)] for k,i in enumerate(self.classes)} # square self.weight?
+        weight_list = torch.Tensor([weight_dict[min(self.classes, key=lambda c: abs(c - y))]
+            for y in weight_list]).to(input.device)
         return F.mse_loss(input.squeeze(), target, reduction=self.reduction, weight=weight_list)
     
     def __call__(self, input, target):
-        return self.forward(input, target, weights=self.weights)
+        return self.forward(input, target)
+    
+
+
+class myFScore(Metric):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_state("f_score", default=torch.tensor(0.0))
+        self.add_state("p_val", default=torch.tensor(0.0))
+
+    def update(self, preds: Tensor, target: Tensor) -> None:
+        # preds, target = self._input_format(preds, target)
+        if preds.shape != target.shape:
+            raise ValueError("preds and target must have the same shape")
+        all_classes = np.unique(target.cpu().numpy())
+        groups = [preds[target == cls].cpu().detach().numpy() for cls in all_classes]
+        if len(groups) > 1:
+            f,p = f_oneway(*groups)
+            self.f_score = torch.tensor(f, dtype=torch.float32)
+            self.p_val = torch.tensor(p, dtype=torch.float32)
+        else:
+            self.f_score = torch.tensor(0.0, dtype=torch.float32)
+            self.p_val = torch.tensor(1.0, dtype=torch.float32)
+
+    def compute(self) -> Tensor:
+        return torch.tensor(self.f_score, dtype=torch.float32)

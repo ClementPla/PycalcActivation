@@ -2,7 +2,7 @@ from argparse import _ArgumentGroup
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import is_regressor
 import torch
@@ -14,7 +14,7 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import Accuracy, CohenKappa, ConfusionMatrix
 
 from PycalcAct.utils.wrapper import on_keyboard_interrup
-from PycalcAct.myCustomCriterion import myMSELoss
+from PycalcAct.myCustomCriterion import myMSELoss, myFScore
 
 class Trainer:
     def __init__(
@@ -58,6 +58,7 @@ class Trainer:
             dict(
                 Accuracy=Accuracy(task="multiclass", num_classes=self.dataset.num_classes),
                 CohenKappa=CohenKappa(task="multiclass", num_classes=self.dataset.num_classes),
+                myFScore=myFScore(),
             )
         ).to(device)
         self.confmat = ConfusionMatrix(task="multiclass", num_classes=self.dataset.num_classes).to(device)
@@ -74,7 +75,7 @@ class Trainer:
     def default_criterion(self):
         if self.is_regression:
             if self.use_class_weights:
-                return myMSELoss(weights=self.dataset.weights)
+                return myMSELoss(weights=self.dataset.weights, classes=np.unique(self.dataset.y_train))
             else:
                 return torch.nn.MSELoss()
                 # return torch.nn.L1Loss()

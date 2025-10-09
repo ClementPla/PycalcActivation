@@ -1,6 +1,5 @@
 from operator import is_
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import torch
@@ -21,31 +20,32 @@ class FromLegendFileCSV:
         col_classesAPL = 6
         col_conc = 7
         col_CTFR = 8
-        col_customFilter = 10
+        col_customFilter = 9
         col_user = 11
-        scaling_factor = 0.4
+        # scaling_factor = 0.4
         this_dict = {
-                "N4" : np.log10(2.28e-13),
-                "Q4" : np.log10(7.37e-11),
-                "T4" : np.log10(4.76e-10),
-                "Q4H7" : np.log10(2.46e-9),
-                "M9" : np.log10(2.64e-12),
-                "L6F" : np.log10(1e-8),
-                "C9" : np.log10(5.29e-8),
-                "OT3_N4" : np.log10(2.34e-11),
-                "OT3_Q4" : np.log10(3.92e-12),
+                "N4" : 2.28e-13,
+                "Q4" : 7.37e-11,
+                "T4" : 4.76e-10,
+                "Q4H7" : 2.46e-9,
+                "M9" : 2.64e-12,
+                "L6F" : 1e-8,
+                "C9" : 5.29e-8,
+                "OT3_N4" : 2.34e-11,
+                "OT3_Q4" : 3.92e-12,
             }
-
+        this_dict = {k:np.log10(v) for k,v in this_dict.items()}
         myDay = pd.DataFrame([d for d in df[col_customFilter]])
         if customFilter == None:
             filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
                            (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
-                           (df[col_CTFR] != "OT3-CTFR")& (df[col_user] == "ST")).values
+                           ([item in ["N4", "Q4", "T4", "Q4H7"] for item in df[col_classesAPL]])
+                           & (df[col_user] == "ST")).values
         else:
             filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
                            (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
-                           (df[col_CTFR] != "OT3-CTFR")& (df[col_user] == "ST") & 
-                           (myDay[0] != customFilter)).values
+                           ([item in ["N4", "Q4", "T4", "Q4H7"] for item in df[col_classesAPL]]) 
+                           & (df[col_user] == "ST") & (myDay[0] != customFilter)).values
             
         df = df[filter_bool]
         sorting_indices = df[col_classesAPL].argsort()
@@ -57,12 +57,14 @@ class FromLegendFileCSV:
         # self.mapping = {v: k for k, v in self.inv_mapping.items()}
         
         # self.mapping = {k: v for k, v in enumerate(unique_classes)}
-        self.mapping = {0: 'N4', 1: 'Q4', 2: 'T4', 3: 'Q4H7'}
-        self.inv_mapping = {v: k for k, v in self.mapping.items()}
+        
 
         self.data = df.iloc[:, -120:].values
         if is_regression:
             classes_int = np.asarray([this_dict[apl] for apl in classes])
+            self.inv_mapping = {key: value for key, value in this_dict.items() if key in unique_classes}
+            self.mapping = {v: k for k, v in self.inv_mapping.items()}
+            
             # if augment_gt == "rand":
             #     classes_int = [t+(0.5-np.random.rand())*scaling_factor for t in classes_int]
             # elif augment_gt == "Ca":
@@ -73,6 +75,8 @@ class FromLegendFileCSV:
                 
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
+            self.mapping = {0: 'N4', 1: 'Q4', 2: 'T4', 3: 'Q4H7'}
+            self.inv_mapping = {v: k for k, v in self.mapping.items()}
             
 
         self.filter = filter_bool
@@ -287,7 +291,7 @@ class Dataset:
 
     @property
     def weights(self):
-        class_weights = compute_class_weight("balanced", classes=np.unique(self.y_train), y=self.y_train)
+        class_weights = compute_class_weight("balanced", classes=np.unique(self.y_train), y=self.y_train) 
         return torch.from_numpy(class_weights).float()
 
     def __repr__(self):
