@@ -75,7 +75,8 @@ class FromLegendFileCSV:
                 
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
-            self.mapping = {0: 'N4', 1: 'Q4', 2: 'T4', 3: 'Q4H7'}
+            self.mapping = {k: v for k, v in enumerate(unique_classes)}
+            # self.mapping = {0: 'N4', 1: 'Q4', 2: 'T4', 3: 'Q4H7'}
             self.inv_mapping = {v: k for k, v in self.mapping.items()}
             
 

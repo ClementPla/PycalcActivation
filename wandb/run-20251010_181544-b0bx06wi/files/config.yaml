@@ -1,0 +1,92 @@
+_wandb:
+    value:
+        cli_version: 0.22.2
+        e:
+            i34d4xrck3ey8wvujgf1a0x3mjgkbafb:
+                codePath: model_hyperoptim_wandb.py
+                codePathLocal: model_hyperoptim_wandb.py
+                cpu_count: 8
+                cpu_count_logical: 8
+                cudaVersion: "12.6"
+                disk:
+                    /:
+                        total: "2000263573504"
+                        used: "654025756672"
+                email: sebthis@gmail.com
+                executable: D:\Sebastien\Anaconda\envs\calcium\python.exe
+                git:
+                    commit: a776e4c839573baa80f0849da6ac6011315792c3
+                    remote: https://github.com/ClementPla/PycalcActivation.git
+                gpu: NVIDIA GeForce GTX 1050 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Pascal
+                      cudaCores: 768
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce GTX 1050 Ti
+                      uuid: GPU-04dd149a-e722-c7c6-46bc-0cb9d535bb5f
+                host: HMR-BLOOD
+                memory:
+                    total: "34153668608"
+                os: Windows-10-10.0.26100-SP0
+                program: d:\Sebastien\PycalcActivation\model_hyperoptim_wandb.py
+                python: CPython 3.10.16
+                root: D:\Sebastien\PycalcActivation
+                startedAt: "2025-10-10T22:15:44.787922Z"
+                writerId: i34d4xrck3ey8wvujgf1a0x3mjgkbafb
+        m: []
+        python_version: 3.10.16
+        t:
+            "1":
+                - 1
+                - 5
+                - 41
+                - 53
+            "2":
+                - 1
+                - 5
+                - 41
+                - 53
+            "3":
+                - 2
+                - 14
+            "4": 3.10.16
+            "5": 0.22.2
+            "8":
+                - 3
+            "12": 0.22.2
+            "13": windows-amd64
+batch_size:
+    value: 4494
+bidir:
+    value: false
+customLoss:
+    value: false
+dropout:
+    value: 0.25598277390955126
+initial_lr:
+    value: 0.02433429947052071
+numFC:
+    value: 4
+numRNN:
+    value: 4
+remove_mean:
+    value: false
+replace_nan_by_min:
+    value: true
+sizeFC:
+    value: 40
+sizeRNN:
+    value: 29
+weight_decay:
+    value: 0.0001192802689036645
+weighted:
+    value: true
+whichDataset:
+    value: ratio
+whichDisplacement:
+    value: true
+whichFFT:
+    value: true
+xyDisplacement:
+    value: true

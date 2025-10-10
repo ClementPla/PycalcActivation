@@ -1,5 +1,6 @@
 data/
 .vscode/
+models/round3
 
 # torch savepoints
 *.pth

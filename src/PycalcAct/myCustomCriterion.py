@@ -55,22 +55,27 @@ class myMSELoss:
 class myFScore(Metric):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.add_state("f_score", default=torch.tensor(0.0))
-        self.add_state("p_val", default=torch.tensor(0.0))
+        self.add_state("f_score", default=torch.tensor(0.0), dist_reduce_fx="mean")
+        self.add_state("p_val", default=torch.tensor(0.0), dist_reduce_fx="mean")
+        self.add_state("num_batches", default=torch.tensor(0.), dist_reduce_fx="mean")
 
     def update(self, preds: Tensor, target: Tensor) -> None:
         # preds, target = self._input_format(preds, target)
-        if preds.shape != target.shape:
-            raise ValueError("preds and target must have the same shape")
+        # if preds.shape != target.shape:
+        #     raise ValueError("preds and target must have the same shape")
         all_classes = np.unique(target.cpu().numpy())
+        if preds.dim() >1:
+            preds = torch.argmax(preds, dim=1)
         groups = [preds[target == cls].cpu().detach().numpy() for cls in all_classes]
-        if len(groups) > 1:
-            f,p = f_oneway(*groups)
-            self.f_score = torch.tensor(f, dtype=torch.float32)
-            self.p_val = torch.tensor(p, dtype=torch.float32)
+        
+        f,p = f_oneway(*groups)
+        # print(f)
+        if not np.isnan(f):
+            self.f_score += torch.tensor(f, dtype=torch.float32)
+            self.p_val += torch.tensor(p, dtype=torch.float32)
         else:
-            self.f_score = torch.tensor(0.0, dtype=torch.float32)
-            self.p_val = torch.tensor(1.0, dtype=torch.float32)
-
+            self.f_score += torch.tensor(0.0, dtype=torch.float32)
+            self.p_val += torch.tensor(1.0, dtype=torch.float32)
+        self.num_batches += 1
     def compute(self) -> Tensor:
-        return torch.tensor(self.f_score, dtype=torch.float32)
+        return self.f_score / self.num_batches

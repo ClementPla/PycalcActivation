@@ -54,6 +54,7 @@ class Trainer:
         self._store_best = store_best
         self.batch_size = batch_size
 
+        
         self.metrics = MetricCollection(
             dict(
                 Accuracy=Accuracy(task="multiclass", num_classes=self.dataset.num_classes),
@@ -61,6 +62,7 @@ class Trainer:
                 myFScore=myFScore(),
             )
         ).to(device)
+        
         self.confmat = ConfusionMatrix(task="multiclass", num_classes=self.dataset.num_classes).to(device)
 
         self._best_state_dict = self._initial_state_dict

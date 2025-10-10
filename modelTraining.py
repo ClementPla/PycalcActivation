@@ -1,3 +1,4 @@
+from math import e
 import numpy as np
 from sympy import Q
 import torch
@@ -9,9 +10,8 @@ from PycalcAct.model import (
 from PycalcAct.trainer import Trainer
 from PycalcAct.calculateCustomAccuracy import calculateCustomAccuracy
 from pathlib import Path
-from PycalcAct.myCustomCriterion import myCustomCriterion
+from PycalcAct.myCustomCriterion import myCustomCriterion, myFScore
 _ = torch.manual_seed(1234)
-from scipy.stats import f_oneway
 from socket import gethostname
 
 
@@ -23,12 +23,10 @@ elif gethostname() == 'Hmr_lymph':
     conditionPath = Path('D:/SebastienThis/CalciumPredictions/PycalcActivation/trainingOptions_round2.csv')
     dataFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData")
     saveFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models")
-elif gethostname() == 'HMR_BLOOD':
+elif gethostname() == 'HMR-BLOOD':
     conditionPath = Path('D:/Sebastien/PycalcActivation/trainingOptions_round3.csv')
     dataFolder = Path("D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
     saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
-
-
 
 myCondition = pd.read_csv(conditionPath, header=None)
 myLegend = myCondition.iloc[0,:]
@@ -59,13 +57,13 @@ for cdt in myCondition:
     if donePath.exists():
         done = np.load(donePath)
     else:
-        done = np.array()
+        done = np.array([])
         
     if np.isin(done,modelNum).any():
         print("Already trained")
     else:
 
-        print(f"NumberModel = {modelNum}/{len(myCondition)}, Dataset = {whichDataset}, Displacement = {whichDisplacement},  Displacement as XY = {xyDisplacement}, Replace Nan by mean = {whichReplaceNan}, Remove Mean = {whichRemoveMean}, FFT = {whichFFT} \n #RNN = {numRNN}, size RNN = {sizeRNN}, bidirectional = {bidir}, #FC = {numFC}, size FC = {sizeFC}, dropout = {dropout}")
+        print(f"NumberModel = {modelNum}/{len(myCondition)}, Regression = {is_regression},  Dataset = {whichDataset}, Displacement = {whichDisplacement},  Displacement as XY = {xyDisplacement}, Replace Nan by mean = {whichReplaceNan}, Remove Mean = {whichRemoveMean}, FFT = {whichFFT} \n #RNN = {numRNN}, size RNN = {sizeRNN}, bidirectional = {bidir}, #FC = {numFC}, size FC = {sizeFC}, dropout = {dropout}")
 
         # create model folder
         thisPath = saveFolder.joinpath(modelNum)
@@ -96,14 +94,7 @@ for cdt in myCondition:
 
         replace_nan_by_min = True if whichReplaceNan else False
         remove_mean = True if whichRemoveMean else False
-        
-        if is_regression:
-            regression_bounds_y = [-12,-10,-9]
-            regression_bounds_y_pred = [-12,-10,-9]
-            weighted = False
-        else:
-            regression_bounds_y = None
-            regression_bounds_y_pred = None
+
 
         if augment_gt == "N":
             augment_gt = None
@@ -117,12 +108,12 @@ for cdt in myCondition:
             remove_mean=remove_mean,
             replace_nan_by_min=replace_nan_by_min,
             customFilter = customFilter, 
-            is_regression=False, #True,
+            is_regression=is_regression, #True,
             augment_gt = augment_gt,
             forEval = False,
             # Convert the x, y position to a single displacement value (sqrt((x(t+1)-x(t))^2 + (y(t+1)-y(t))^2)
             )
-        
+
         if whichFFT:
             dataset.create_new_feature_by_operations(lambda x: np.abs(np.fft.fft(x[:, 0])))
             if whichDataset == "indiv":
@@ -133,7 +124,7 @@ for cdt in myCondition:
 
         # Setup model
         model = MixedFCTemporalModel(
-            n_classes=dataset.n_classes,
+            n_classes=dataset.n_classes if not is_regression else 1,
             n_rnn_layers=numRNN,
             rnn_hidden_size=sizeRNN,
             n_fc_layers=numFC,
@@ -144,7 +135,6 @@ for cdt in myCondition:
             pooling=None,
             dropout=dropout
         )
-
         # Setup training
         n_epochs = 500
         criterion = None
@@ -160,18 +150,20 @@ for cdt in myCondition:
             dataset,
             model,
             device="cuda",
-            batch_size=2000,
+            batch_size=500 if is_regression else 2000,
             criterion= criterion,
+            store_best='myFScore' if is_regression else 'Accuracy',
             use_class_weights= weighted,
-            regression_bounds_y = regression_bounds_y,
-            regression_bounds_y_pred = regression_bounds_y_pred
-        )  
+            is_regression = is_regression,
+            regression_bounds_y = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
+            regression_bounds_y_pred = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
+        ) 
+
         # train model
         trainer.train(n_epochs)
-        # trainer.test("best")
 
         # save model
-        thisModelName = thisPath / "savedModel.pt"
+        thisModelName = thisPath.joinpath("savedModel.pt")
         torch.save(
             {
                 "model": trainer.model.state_dict(),
@@ -185,21 +177,23 @@ for cdt in myCondition:
          
         # save metrics
         fig, metrics = trainer.test("best", show_confmat=False)  # Testing on the best model (in term of validation accuracy)
-        np.save(thisPath / 'metrics.npy', metrics)
-        
-        narr = np.array([metrics['Accuracy'].tolist(), metrics['CohenKappa'].tolist()])
-        np.savetxt(thisPath / 'MetricsValue.csv', narr, delimiter=",")
+        np.save(thisPath.joinpath('metrics.npy'), metrics)
+        if is_regression:
+            narr = np.array([metrics['Accuracy'].tolist(), metrics['CohenKappa'].tolist(), metrics['myFScore'].tolist()])
+        else:
+            narr = np.array([metrics['Accuracy'].tolist(), metrics['CohenKappa'].tolist()])
+        np.savetxt(thisPath.joinpath('MetricsValue.csv'), narr, delimiter=",")
 
         # save figure
-        fig.savefig(thisPath / 'confusionMatrix.pdf')
+        fig.savefig(thisPath.joinpath('confusionMatrix.pdf'))
 
         # save confusion matrix
         thisConfmat =  trainer.confmat.compute()
         thisConfmat = np.array(thisConfmat.cpu(), dtype = str)   
         labels=np.array(trainer.dataset.labels, dtype = str)
         writeConfmat = np.column_stack((labels,thisConfmat))
-        writeConfmat = np.row_stack((np.concatenate(([' '], labels)), writeConfmat))
-        np.savetxt(thisPath / 'confusionMatrix.csv', writeConfmat, delimiter=",", fmt='%s')
+        writeConfmat = np.vstack((np.concatenate(([' '], labels)), writeConfmat))
+        np.savetxt(thisPath.joinpath('confusionMatrix.csv'), writeConfmat, delimiter=",", fmt='%s')
 
         # update allCondition file.
         if not is_regression:
@@ -213,7 +207,7 @@ for cdt in myCondition:
             myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "Custom_Acc"] = f"{customAcc:.4f}"
             myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
         else:
-            
+            _, metrics_last = trainer.test("last", show_confmat=False)  # Testing on the last model (in term of validation accuracy)
             myFile = pd.read_csv(conditionPath, header=None)
             myFile.loc[myFile.iloc[:,0] == modelNum, myLegend == "Accuracy"] = f"{metrics['Accuracy']:.4f}"
             myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "N4_Acc"] = f"{metrics_last['Accuracy']:.4f}"
@@ -221,33 +215,41 @@ for cdt in myCondition:
             myFile.loc[myFile.iloc[:,0] == modelNum,myLegend == "T4_Acc"] = f"{metrics_last['myFScore']:.4f}"
             myFile.to_csv(conditionPath,sep = ",", header = False, index = False)
 
+        # print regression figure
+        if is_regression:
             x_test, y_test = trainer.dataset.test_batch(True, to_cuda=True)
             x_train, y_train = trainer.dataset.train_batch(True, to_cuda=True)
-            
             all_classes = np.unique(y_train.cpu().numpy())
 
-            trainer.load_best()
+            # best model
+            trainer.load_best()     
             y_pred_train = trainer.model(torch.Tensor(x_train))
             y_pred_test = trainer.model(torch.Tensor(x_test))
+            f_train = myFScore()
+            f_test = myFScore()
+            f_train.update(preds = torch.tensor(y_pred_train), target = torch.tensor(y_train))
+            f_test.update(preds = torch.tensor(y_pred_test), target = torch.tensor(y_test))
             fig, [ax, ax1] = plt.subplots(1,2)
             for cls in all_classes:
                 ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
                 ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
-            ax.title.set_text('train dataset')
-            ax1.title.set_text('test dataset')
+            ax.title.set_text('train dataset - Fscore = ' + str(f_train.compute().numpy()))
+            ax1.title.set_text('test dataset - Fscore = ' + str(f_test.compute().numpy()))
             fig.suptitle('Best Model') 
-            plt.savefig(thisPath / 'predictionDistribution_best.pdf')
+            plt.savefig(thisPath.joinpath('predictionDistribution_best.pdf'))
             trainer.load_last()
             y_pred_train = trainer.model(torch.Tensor(x_train))
             y_pred_test = trainer.model(torch.Tensor(x_test))
+            f_train.update(preds = torch.tensor(y_pred_train), target = torch.tensor(y_train))
+            f_test.update(preds = torch.tensor(y_pred_test), target = torch.tensor(y_test))
             fig, [ax, ax1] = plt.subplots(1,2)
             for cls in all_classes:
                 ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
                 ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
-            ax.title.set_text("train dataset")
-            ax1.title.set_text("test dataset")
+            ax.title.set_text('train dataset - Fscore = ' + str(f_train.compute().numpy()))
+            ax1.title.set_text('test dataset - Fscore = ' + str(f_test.compute().numpy()))
             fig.suptitle('Last Model') 
-            plt.savefig(thisPath / 'predictionDistribution_last.pdf')
+            plt.savefig(thisPath.joinpath('predictionDistribution_last.pdf'))
             
             
         done = np.append(done, modelNum)

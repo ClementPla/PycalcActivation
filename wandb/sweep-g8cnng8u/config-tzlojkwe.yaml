@@ -1,0 +1,38 @@
+wandb_version: 1
+
+augment_gt:
+  value: false
+batch_size:
+  value: 2862
+bidir:
+  value: false
+customLoss:
+  value: false
+dropout:
+  value: 0.3408297357366293
+initial_lr:
+  value: 0.03760224040201807
+numFC:
+  value: 1
+numRNN:
+  value: 4
+remove_mean:
+  value: false
+replace_nan_by_min:
+  value: true
+sizeFC:
+  value: 45
+sizeRNN:
+  value: 65
+weight_decay:
+  value: 0.004051572192828351
+weighted:
+  value: false
+whichDataset:
+  value: ratioNorm
+whichDisplacement:
+  value: true
+whichFFT:
+  value: false
+xyDisplacement:
+  value: true

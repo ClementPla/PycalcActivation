@@ -1,0 +1,57 @@
+_wandb:
+    value:
+        cli_version: 0.22.2
+        e:
+            svqjwt43upbiao56hosx19h3i2w839ai:
+                codePath: model_hyperoptim_wandb.py
+                codePathLocal: model_hyperoptim_wandb.py
+                cpu_count: 8
+                cpu_count_logical: 8
+                cudaVersion: "12.6"
+                disk:
+                    /:
+                        total: "2000263573504"
+                        used: "654025224192"
+                email: sebthis@gmail.com
+                executable: D:\Sebastien\Anaconda\envs\calcium\python.exe
+                git:
+                    commit: a776e4c839573baa80f0849da6ac6011315792c3
+                    remote: https://github.com/ClementPla/PycalcActivation.git
+                gpu: NVIDIA GeForce GTX 1050 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Pascal
+                      cudaCores: 768
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce GTX 1050 Ti
+                      uuid: GPU-04dd149a-e722-c7c6-46bc-0cb9d535bb5f
+                host: HMR-BLOOD
+                memory:
+                    total: "34153668608"
+                os: Windows-10-10.0.26100-SP0
+                program: d:\Sebastien\PycalcActivation\model_hyperoptim_wandb.py
+                python: CPython 3.10.16
+                root: D:\Sebastien\PycalcActivation
+                startedAt: "2025-10-10T21:57:54.147563Z"
+                writerId: svqjwt43upbiao56hosx19h3i2w839ai
+        m: []
+        python_version: 3.10.16
+        t:
+            "1":
+                - 1
+                - 5
+                - 41
+                - 53
+            "2":
+                - 1
+                - 5
+                - 41
+                - 53
+            "3":
+                - 2
+            "4": 3.10.16
+            "5": 0.22.2
+            "8":
+                - 3
+            "12": 0.22.2
+            "13": windows-amd64

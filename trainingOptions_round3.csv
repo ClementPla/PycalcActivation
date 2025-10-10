@@ -1,7 +1,8 @@
 name,inputData,displacement,replaceNan,removeMean,FFT,#RNN,sizeRNN,bidirectional,#FC,numFC,Dropout,Weigthed,Custom_loss,xyDisplacement,is_regression,augmentation,Accuracy,N4_Acc,Q4_Acc,T4_Acc,Q4H7_Acc,Custom_Acc,Testing_Metric
-1,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,0,0,0,0,N,,,,,,,
-2,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,0,1,0,0,N,,,,,,,
-3,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,1,0,0,0,N,,,,,,,
+1,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,0,0,0,0,N,0.6082,0.8312,0.3784,0.4587,0.6328,0.5067,
+2,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,0,0,0,1,N,0.4730,0.4559,78.1867,77.0943,,,
+2,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,0,1,0,0,N,0.4730,0.4559,78.1867,77.0943,,,
+3,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,1,0,0,0,N,0.6037,0.7753,0.4764,0.4120,0.6310,0.5115,
 4,ratioNorm,1,1,0,0,1,16,0,1,16,0.1,1,1,0,0,N,,,,,,,
 5,ratioNorm,1,1,0,0,1,16,0,1,16,0.2,0,0,0,0,N,,,,,,,
 6,ratioNorm,1,1,0,0,1,16,0,1,16,0.2,0,1,0,0,N,,,,,,,

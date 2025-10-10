@@ -1,0 +1,4 @@
+Accuracy,CohenKappa,myFScore
+"tensor(0.4318, device='cuda:0')","tensor(0., device='cuda:0')","tensor(0., device='cuda:0')"
+"tensor(0.4319, device='cuda:0')","tensor(0., device='cuda:0')","tensor(0., device='cuda:0')"
+"tensor(0.4318, device='cuda:0')","tensor(0., device='cuda:0')","tensor(0., device='cuda:0')"
