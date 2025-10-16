@@ -28,9 +28,9 @@ def getPath():
     if gethostname() == 'HM_Lab':
         dataFolder = Path("D:/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
         saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
-    elif gethostname() == 'Hmr_lymph':
-        dataFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/trainingData")
-        saveFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/models")
+    elif gethostname() == 'HMR_LYMPH':
+        dataFolder = Path("D:/SebastienThis/CalciumPredictions/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
+        saveFolder = Path("D:/SebastienThis/CalciumPredictions/PycalcActivation/models/round3")
     elif gethostname() == 'HMR-BLOOD':
         dataFolder = Path("D:/Sebastien/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
         saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
