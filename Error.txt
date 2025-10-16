@@ -1,0 +1,159 @@
+C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\pydantic\_internal\_generate_schema.py:2249: UnsupportedFieldAttributeWarning: The 'repr' attribute with value False was provided to the `Field()` function, which has no effect in the context it was used. 'repr' is field-specific metadata, and can only be attached to a model field using `Annotated` metadata or by assignment. This may have happened because an `Annotated` type alias using the `type` statement was used, or if the `Field()` function was attached to a single member of a union type.
+  warnings.warn(
+C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\pydantic\_internal\_generate_schema.py:2249: UnsupportedFieldAttributeWarning: The 'frozen' attribute with value True was provided to the `Field()` function, which has no effect in the context it was used. 'frozen' is field-specific metadata, and can only be attached to a model field using `Annotated` metadata or by assignment. This may have happened because an `Annotated` type alias using the `type` statement was used, or if the `Field()` function was attached to a single member of a union type.
+  warnings.warn(
+Create sweep with ID: v3cx25eu
+Sweep URL: https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/sweeps/v3cx25eu
+wandb: Agent Starting Run: qzp2ndau with config:
+wandb:  batch_size: 256
+wandb:  bidir: False
+wandb:  customLoss: False
+wandb:  dropout: 0.17847304307654557
+wandb:  initial_lr: 0.01
+wandb:  numFC: 2
+wandb:  numRNN: 3
+wandb:  remove_mean: True
+wandb:  replace_nan_by_min: True
+wandb:  sizeFC: 16
+wandb:  sizeRNN: 32
+wandb:  weight_decay: 0.001
+wandb:  weighted: True
+wandb:  whichDataset: indiv
+wandb:  whichDisplacement: True
+wandb:  whichFFT: True
+wandb:  xyDisplacement: True
+wandb: Currently logged in as: sebthis (sebthis-mcgill-university) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Ignoring project 'my-first-sweep-regressor' when running a sweep.
+wandb: Tracking run with wandb version 0.22.2
+wandb: Run data is saved locally in D:\SebastienThis\CalciumPredictions\PycalcActivation\wandb\run-20251015_201813-qzp2ndau
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run treasured-sweep-1
+wandb:  View project at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor
+wandb:  View sweep at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/sweeps/v3cx25eu
+wandb:  View run at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/runs/qzp2ndau
+D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\dataset.py:15: DtypeWarning: Columns (7) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(datapath, header=None)
+D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\dataset.py:40: FutureWarning: Logical ops (and, or, xor) between Pandas objects and dtype-less sequences (e.g. list, tuple) are deprecated and will raise in a future version. Wrap the object in a Series, Index, or np.array before operating instead.
+  filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) &
+Traceback (most recent call last):
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 18, in main
+    model_unique_name, metric_train, metric_test = objective(run.config, is_regression)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 12, in objective
+    trainer.train(n_epoch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\utils\wrapper.py", line 9, in wrapper_interrup
+    return func(self, *args, **kwargs)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\trainer.py", line 217, in train
+    loss = self.criterion(y_pred, y_batch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 51, in __call__
+    return self.forward(input, target)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 48, in forward
+    return F.mse_loss(input.squeeze(), target, reduction=self.reduction, weight=weight_list)
+TypeError: mse_loss() got an unexpected keyword argument 'weight'
+wandb:  View run treasured-sweep-1 at: https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/runs/qzp2ndau
+wandb:  View project at: https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20251015_201813-qzp2ndau\logs
+Traceback (most recent call last):
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\wandb\agents\pyagent.py", line 297, in _run_job
+    self._function()
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 52, in <lambda>
+    wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression), count=200)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 18, in main
+    model_unique_name, metric_train, metric_test = objective(run.config, is_regression)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 12, in objective
+    trainer.train(n_epoch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\utils\wrapper.py", line 9, in wrapper_interrup
+    return func(self, *args, **kwargs)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\trainer.py", line 217, in train
+    loss = self.criterion(y_pred, y_batch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 51, in __call__
+    return self.forward(input, target)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 48, in forward
+    return F.mse_loss(input.squeeze(), target, reduction=self.reduction, weight=weight_list)
+TypeError: mse_loss() got an unexpected keyword argument 'weight'
+
+wandb: ERROR Run qzp2ndau errored: mse_loss() got an unexpected keyword argument 'weight'
+wandb: Agent Starting Run: sbkjvv6l with config:
+wandb:  batch_size: 1024
+wandb:  bidir: False
+wandb:  customLoss: True
+wandb:  dropout: 0.10360205546936332
+wandb:  initial_lr: 0.001
+wandb:  numFC: 3
+wandb:  numRNN: 3
+wandb:  remove_mean: True
+wandb:  replace_nan_by_min: True
+wandb:  sizeFC: 8
+wandb:  sizeRNN: 32
+wandb:  weight_decay: 0.001
+wandb:  weighted: False
+wandb:  whichDataset: ratio
+wandb:  whichDisplacement: True
+wandb:  whichFFT: True
+wandb:  xyDisplacement: False
+wandb: WARNING Ignoring project 'my-first-sweep-regressor' when running a sweep.
+wandb: Tracking run with wandb version 0.22.2
+wandb: Run data is saved locally in D:\SebastienThis\CalciumPredictions\PycalcActivation\wandb\run-20251015_201834-sbkjvv6l
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run glad-sweep-2
+wandb:  View project at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor
+wandb:  View sweep at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/sweeps/v3cx25eu
+wandb:  View run at https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/runs/sbkjvv6l
+D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\dataset.py:15: DtypeWarning: Columns (7) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(datapath, header=None)
+D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\dataset.py:40: FutureWarning: Logical ops (and, or, xor) between Pandas objects and dtype-less sequences (e.g. list, tuple) are deprecated and will raise in a future version. Wrap the object in a Series, Index, or np.array before operating instead.
+  filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) &
+Traceback (most recent call last):
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 18, in main
+    model_unique_name, metric_train, metric_test = objective(run.config, is_regression)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 12, in objective
+    trainer.train(n_epoch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\utils\wrapper.py", line 9, in wrapper_interrup
+    return func(self, *args, **kwargs)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\trainer.py", line 217, in train
+    loss = self.criterion(y_pred, y_batch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 32, in __call__
+    return self.forward(input, target)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 22, in forward
+    crossEntropyLoss = myFunction(input, target).to(self.device)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\loss.py", line 1188, in forward
+    return F.cross_entropy(input, target, weight=self.weight,
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\functional.py", line 3104, in cross_entropy
+    return torch._C._nn.cross_entropy_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index, label_smoothing)
+RuntimeError: cross_entropy: weight tensor should be defined either for all 1024 classes or no classes but got weight tensor of shape: [4]
+wandb:  View run glad-sweep-2 at: https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor/runs/sbkjvv6l
+wandb:  View project at: https://wandb.ai/sebthis-mcgill-university/my-first-sweep-regressor
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20251015_201834-sbkjvv6l\logs
+Traceback (most recent call last):
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\wandb\agents\pyagent.py", line 297, in _run_job
+    self._function()
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 52, in <lambda>
+    wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression), count=200)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 18, in main
+    model_unique_name, metric_train, metric_test = objective(run.config, is_regression)
+  File "d:\SebastienThis\CalciumPredictions\PycalcActivation\model_hyperoptim_wandb.py", line 12, in objective
+    trainer.train(n_epoch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\utils\wrapper.py", line 9, in wrapper_interrup
+    return func(self, *args, **kwargs)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\trainer.py", line 217, in train
+    loss = self.criterion(y_pred, y_batch)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 32, in __call__
+    return self.forward(input, target)
+  File "D:\SebastienThis\CalciumPredictions\PycalcActivation\src\PycalcAct\myCustomCriterion.py", line 22, in forward
+    crossEntropyLoss = myFunction(input, target).to(self.device)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\modules\loss.py", line 1188, in forward
+    return F.cross_entropy(input, target, weight=self.weight,
+  File "C:\Users\transformer\anaconda3\envs\calcium\lib\site-packages\torch\nn\functional.py", line 3104, in cross_entropy
+    return torch._C._nn.cross_entropy_loss(input, target, weight, _Reduction.get_enum(reduction), ignore_index, label_smoothing)
+RuntimeError: cross_entropy: weight tensor should be defined either for all 1024 classes or no classes but got weight tensor of shape: [4]
+
+wandb: Ctrl + C detected. Stopping sweep.
