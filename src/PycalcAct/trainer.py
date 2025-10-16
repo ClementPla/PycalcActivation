@@ -234,8 +234,8 @@ class Trainer:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
                     if verbose:
-                        table.update(self._store_best, scores[self._store_best].item() * 100, color="green")
-                        table.update(self._store_best, scores[self._store_best].item() * 100, color="green")
+                        table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
+                        table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
 
                     table.next_row()
 

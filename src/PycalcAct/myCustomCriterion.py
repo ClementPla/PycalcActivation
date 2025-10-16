@@ -64,7 +64,7 @@ class myFScore(Metric):
         # if preds.shape != target.shape:
         #     raise ValueError("preds and target must have the same shape")
         all_classes = np.unique(target.cpu().numpy())
-        if preds.dim() >1:
+        if preds.squeeze().dim() >1:
             preds = torch.argmax(preds, dim=1)
         groups = [preds[target == cls].cpu().detach().numpy() for cls in all_classes]
         
@@ -77,5 +77,6 @@ class myFScore(Metric):
             self.f_score += torch.tensor(0.0, dtype=torch.float32)
             self.p_val += torch.tensor(1.0, dtype=torch.float32)
         self.num_batches += 1
+        
     def compute(self) -> Tensor:
         return self.f_score / self.num_batches

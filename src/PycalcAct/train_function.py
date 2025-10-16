@@ -136,7 +136,7 @@ def setupTrainer(config, is_regression):
         batch_size=batch_size,
         criterion= criterion,
         store_best='myFScore' if is_regression else 'Accuracy',
-        use_class_weights= weighted,
+        use_class_weights = weighted,
         is_regression = is_regression,
         regression_bounds_y = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
         regression_bounds_y_pred = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
@@ -165,7 +165,9 @@ def save_model_perf(trainer, model_unique_name):
     )
         
     # save metrics
+    trainer.load_best()
     metrics = []
+    thisConfmat = []
     callbacks = (
             trainer.dataset.train_batch,
             trainer.dataset.val_batch,
@@ -176,14 +178,15 @@ def save_model_perf(trainer, model_unique_name):
         if trainer.is_regression:
             _, m = trainer.eval(x, y.type(torch.FloatTensor).to(trainer.device))
             metrics.append(m)
+            thisConfmat.append(np.array(trainer.confmat.compute().cpu(), dtype = str))
         else:
             _, m = trainer.eval(x, y.type(torch.LongTensor).to(trainer.device))
             metrics.append(m)
-    
+            thisConfmat.append(np.array(trainer.confmat.compute().cpu(), dtype = str))
+
     np.save(thisPath.joinpath('metrics.npy'), metrics)
 
-    
-    with open("output.csv", mode="w", newline="") as file:
+    with open(thisPath.joinpath("output.csv"), mode="w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=["Accuracy", "CohenKappa", "myFScore"])
         writer.writeheader()
         writer.writerows(metrics)
@@ -193,50 +196,40 @@ def save_model_perf(trainer, model_unique_name):
     fig, _ = trainer.test("best", show_confmat=False)
     fig.savefig(thisPath.joinpath('confusionMatrix_best.pdf'))
 
-    
     # save confusion matrix
-    thisConfmat =  trainer.confmat.compute()
-    thisConfmat = np.array(thisConfmat.cpu(), dtype = str)   
-    labels=np.array(trainer.dataset.labels, dtype = str)
-    writeConfmat = np.column_stack((labels,thisConfmat))
+    thisConfmat = np.array(thisConfmat).reshape(12,4)
+    labels = np.array(trainer.dataset.labels, dtype = str)
+    labels3=np.tile(labels, 3)
+    writeConfmat = np.column_stack((labels3,thisConfmat))
     writeConfmat = np.vstack((np.concatenate(([' '], labels)), writeConfmat))
     np.savetxt(thisPath.joinpath('confusionMatrix.csv'), writeConfmat, delimiter=",", fmt='%s')
 
     # print regression figure
     if trainer.is_regression:
-        x_test, y_test = trainer.dataset.test_batch(True, to_cuda=True)
-        x_train, y_train = trainer.dataset.train_batch(True, to_cuda=True)
-        all_classes = np.unique(y_train.cpu().numpy())
+        for _, (name, callable) in enumerate(zip(["Train", "Val", "Test"], callbacks)):
+            x, y = callable(True, to_cuda=True)   
+            all_classes = np.unique(y.cpu().numpy())
 
-        # best model
-        trainer.load_best()     
-        y_pred_train = trainer.model(torch.Tensor(x_train))
-        y_pred_test = trainer.model(torch.Tensor(x_test))
-        f_train = myFScore()
-        f_test = myFScore()
-        f_train.update(preds = torch.tensor(y_pred_train), target = torch.tensor(y_train))
-        f_test.update(preds = torch.tensor(y_pred_test), target = torch.tensor(y_test))
-        fig, [ax, ax1] = plt.subplots(1,2)
-        for cls in all_classes:
-            ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
-            ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
-        ax.title.set_text('train dataset - Fscore = ' + str(f_train.compute().numpy()))
-        ax1.title.set_text('test dataset - Fscore = ' + str(f_test.compute().numpy()))
-        fig.suptitle('Best Model') 
-        plt.savefig(thisPath.joinpath('predictionDistribution_best.pdf'))
-        trainer.load_last()
-        y_pred_train = trainer.model(torch.Tensor(x_train))
-        y_pred_test = trainer.model(torch.Tensor(x_test))
-        f_train.update(preds = torch.tensor(y_pred_train), target = torch.tensor(y_train))
-        f_test.update(preds = torch.tensor(y_pred_test), target = torch.tensor(y_test))
-        fig, [ax, ax1] = plt.subplots(1,2)
-        for cls in all_classes:
-            ax.hist(y_pred_train[y_train == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
-            ax1.hist(y_pred_test[y_test == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}") 
-        ax.title.set_text('train dataset - Fscore = ' + str(f_train.compute().numpy()))
-        ax1.title.set_text('test dataset - Fscore = ' + str(f_test.compute().numpy()))
-        fig.suptitle('Last Model') 
-        plt.savefig(thisPath.joinpath('predictionDistribution_last.pdf'))
+            # best model
+            trainer.load_best()     
+            y_pred = trainer.model(torch.Tensor(x)).squeeze()
+            f = myFScore()
+            f.update(preds = torch.tensor(y_pred), target = torch.tensor(y))
+            fig = plt.figure()
+            for cls in all_classes:
+                _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
+            _ = fig.suptitle('Best Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
+            plt.savefig(thisPath.joinpath('predictionDistribution_best_' + name + '.pdf'))
+
+            trainer.load_last()
+            y_pred = trainer.model(torch.Tensor(x)).squeeze()
+            f = myFScore()
+            f.update(preds = torch.tensor(y_pred), target = torch.tensor(y))
+            fig = plt.figure()
+            for cls in all_classes:
+                _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
+            _ = fig.suptitle('Last Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
+            plt.savefig(thisPath.joinpath('predictionDistribution_last_' + name + '.pdf'))
 
     metric_train = metrics[0]['Accuracy' if not trainer.is_regression else 'myFScore']
     metric_test = metrics[2]['Accuracy' if not trainer.is_regression else 'myFScore']

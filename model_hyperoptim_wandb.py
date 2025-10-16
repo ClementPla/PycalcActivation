@@ -3,8 +3,8 @@ import os
 from PycalcAct.train_function import *
 
 os.environ['WANDB_API_KEY'] = '73246a79f06da26fb325d763bd90ab7fc81bc9e6'
-project_name = "my-first-sweep-classifier"
-is_regression = False
+project_name = "my-first-sweep-regressor"
+is_regression = True
 
 def objective(config, is_regression):
     model_unique_name, trainer = setupTrainer(config, is_regression)
