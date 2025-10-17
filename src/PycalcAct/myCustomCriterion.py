@@ -55,28 +55,34 @@ class myMSELoss:
 class myFScore(Metric):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.add_state("f_score", default=torch.tensor(0.0), dist_reduce_fx="mean")
-        self.add_state("p_val", default=torch.tensor(0.0), dist_reduce_fx="mean")
-        self.add_state("num_batches", default=torch.tensor(0.), dist_reduce_fx="mean")
+        self.add_state("preds", default=[], dist_reduce_fx="cat")
+        self.add_state("target", default=[], dist_reduce_fx="cat")
 
     def update(self, preds: Tensor, target: Tensor) -> None:
-        # preds, target = self._input_format(preds, target)
-        # if preds.shape != target.shape:
-        #     raise ValueError("preds and target must have the same shape")
-        all_classes = np.unique(target.cpu().numpy())
-        if preds.squeeze().dim() >1:
+        # Convert logits to class predictions if needed
+        if preds.squeeze().dim() > 1:
             preds = torch.argmax(preds, dim=1)
-        groups = [preds[target == cls].cpu().detach().numpy() for cls in all_classes]
-        
-        f,p = f_oneway(*groups)
-        # print(f)
-        if not np.isnan(f):
-            self.f_score += torch.tensor(f, dtype=torch.float32)
-            self.p_val += torch.tensor(p, dtype=torch.float32)
-        else:
-            self.f_score += torch.tensor(0.0, dtype=torch.float32)
-            self.p_val += torch.tensor(1.0, dtype=torch.float32)
-        self.num_batches += 1
-        
+
+        preds = preds.detach().cpu()
+        target = target.detach().cpu()
+
+        # Convert to list of tensors
+        self.preds.extend(preds.tolist())
+        self.target.extend(target.tolist())
+
     def compute(self) -> Tensor:
-        return self.f_score / self.num_batches
+        # Convert lists to numpy arrays
+        all_preds = np.array(self.preds)
+        all_targets = np.array(self.target)
+
+        # Identify unique classes
+        all_classes = np.unique(all_targets)
+
+        # Group predictions by true class
+        groups = [all_preds[all_targets == cls] for cls in all_classes]
+
+        # Perform one-way ANOVA
+        f, _ = f_oneway(*groups)
+
+        # Return F-score as tensor
+        return torch.tensor(f if not np.isnan(f) else 0.0, dtype=torch.float32)

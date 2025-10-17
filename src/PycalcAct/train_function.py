@@ -15,12 +15,19 @@ from PycalcAct.myCustomCriterion import myCustomCriterion, myFScore
 _ = torch.manual_seed(1234)
 from socket import gethostname
 import hashlib
-
+import random
+import string
 
 def get_safe_folder_name(config):
     # Convert config to string and hash it
     config_str = str(sorted(config.items()))
-    hash_id = hashlib.md5(config_str.encode()).hexdigest()
+    # Generate a random 8-character string
+    random_suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+    # Combine config string with random component
+    combined_str = config_str + random_suffix
+
+    hash_id = hashlib.md5(combined_str.encode()).hexdigest()
     return f"run_{hash_id}"
 
 
@@ -186,7 +193,7 @@ def save_model_perf(trainer, model_unique_name):
 
     np.save(thisPath.joinpath('metrics.npy'), metrics)
 
-    with open(thisPath.joinpath("output.csv"), mode="w", newline="") as file:
+    with open(thisPath.joinpath("metrics.csv"), mode="w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=["Accuracy", "CohenKappa", "myFScore"])
         writer.writeheader()
         writer.writerows(metrics)
@@ -204,7 +211,10 @@ def save_model_perf(trainer, model_unique_name):
     writeConfmat = np.vstack((np.concatenate(([' '], labels)), writeConfmat))
     np.savetxt(thisPath.joinpath('confusionMatrix.csv'), writeConfmat, delimiter=",", fmt='%s')
 
+ 
+
     # print regression figure
+    allMetrics = []
     if trainer.is_regression:
         for _, (name, callable) in enumerate(zip(["Train", "Val", "Test"], callbacks)):
             x, y = callable(True, to_cuda=True)   
@@ -220,6 +230,7 @@ def save_model_perf(trainer, model_unique_name):
                 _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}")
             _ = fig.suptitle('Best Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
             plt.savefig(thisPath.joinpath('predictionDistribution_best_' + name + '.pdf'))
+            allMetrics.append(f.compute().numpy())
 
             trainer.load_last()
             y_pred = trainer.model(torch.Tensor(x)).squeeze()
@@ -231,7 +242,12 @@ def save_model_perf(trainer, model_unique_name):
             _ = fig.suptitle('Last Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
             plt.savefig(thisPath.joinpath('predictionDistribution_last_' + name + '.pdf'))
 
-    metric_train = metrics[0]['Accuracy' if not trainer.is_regression else 'myFScore']
-    metric_test = metrics[2]['Accuracy' if not trainer.is_regression else 'myFScore']
+        metric_train = allMetrics[0]
+        metric_val = allMetrics[1]
+        metric_test = allMetrics[2]
+    else:
+        metric_train = metrics[0]['Accuracy']
+        metric_val = metrics[1]['Accuracy']
+        metric_test = metrics[2]['Accuracy']
 
-    return metric_train, metric_test
+    return metric_train, metric_val, metric_test

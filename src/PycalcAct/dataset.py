@@ -371,6 +371,9 @@ class Dataset:
     def test_data(self):
         return self.x_test, self.y_test
 
+    def val_data(self):
+        return self.x_val, self.y_val
+    
     def train_data(self):
         return self.x_train, self.y_train
 

@@ -183,11 +183,19 @@ class Trainer:
             default_column_width=25,
         )
 
+        # table.add_column("Epoch")
+        # table.add_column("Loss", color="blue", alignment="right")
+        # table.add_column(self._store_best, color="green", alignment="right")
+        # table.add_column("Loss", color="blue", alignment="right")
+        # table.add_column(self._store_best, color="green", alignment="right")
+
         table.add_column("Epoch")
         table.add_column("Loss", color="blue", alignment="right")
-        table.add_column(self._store_best, color="green", alignment="right")
+        table.add_column("Accuracy", color="green", alignment="right")
+        table.add_column("myFScore", color="red", alignment="right")
         table.add_column("Loss", color="blue", alignment="right")
-        table.add_column(self._store_best, color="green", alignment="right")
+        table.add_column("Accuracy", color="green", alignment="right")
+        table.add_column("myFScore", color="red", alignment="right")  
 
         for e in table(
             range(n_epochs),
@@ -234,8 +242,12 @@ class Trainer:
                     current_best = scores[self._store_best]
                     self._best_state_dict = deepcopy(self.model.state_dict())
                     if verbose:
-                        table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
-                        table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
+                        # table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
+                        # table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
+                        table.update("Accuracy", scores["Accuracy"].item() * 100, color="green")
+                        table.update("myFScore", scores["myFScore"].item(), color="red")
+                        table.update("Accuracy", scores["Accuracy"].item() * 100, color="green")
+                        table.update("myFScore", scores["myFScore"].item(), color="red")
 
                     table.next_row()
 
