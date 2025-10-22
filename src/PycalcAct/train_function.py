@@ -50,7 +50,7 @@ def getPath(is_regression, sweep_id):
         saveFolder = saveFolder.joinpath("regressor")
     else:
         saveFolder = saveFolder.joinpath("classifier")
-    saveFolder = saveFolder.joinpath(sweep_id)
+    saveFolder = saveFolder.joinpath("sweep_"+ sweep_id)
     
     return dataFolder, saveFolder
 
@@ -160,9 +160,9 @@ def setupTrainer(config, is_regression, sweep_id):
     return model_unique_name, trainer
 
 
-def save_model_perf(trainer, model_unique_name):
+def save_model_perf(trainer, model_unique_name, sweep_id):
     # save model
-    _, saveFolder = getPath(trainer.is_regression)   
+    _, saveFolder = getPath(trainer.is_regression, sweep_id)   
     thisPath = saveFolder.joinpath(model_unique_name)
     thisModelName = thisPath.joinpath("savedModel.pt")
 
@@ -259,9 +259,9 @@ def save_model_perf(trainer, model_unique_name):
     return metric_train, metric_val, metric_test
 
 
-def save_model_generalizability(trainer, model_unique_name):
+def save_model_generalizability(trainer, model_unique_name, sweep_id):
     # save model
-    _, saveFolder = getPath(trainer.is_regression)   
+    _, saveFolder = getPath(trainer.is_regression, sweep_id)   
     thisPath = saveFolder.joinpath(model_unique_name)
 
     thisPath = saveFolder.joinpath(model_unique_name)
@@ -332,7 +332,7 @@ def save_model_generalizability(trainer, model_unique_name):
             
             this_interp_distance = np.mean(np.abs(y_interp - y_pred), axis = 0)
             metrics.update({"weighted_distance_" + k: this_interp_distance}) 
-            
+
             # plot distribution
             fig = plt.figure()
             for cls in apl_classes:
@@ -364,11 +364,11 @@ def save_model_generalizability(trainer, model_unique_name):
             metrics.update({"accuracy_" + k : this_accuracy})  # need to max (distance to target)
 
             # print and write all "confusion matrices"
-            n_pred_classes = len(np.unique(predicted_class.cpu()));
-            n_GT_classes = len(apl_classes)
-            this_confmat = np.zeros((n_GT_classes, n_pred_classes))
-            for r in range(0, n_GT_classes):
-                for c in range(0,n_pred_classes):
+            n_pred_classes = len(pred)
+            n_GT_classes = len(GT)
+            this_confmat = np.zeros((n_pred_classes, n_GT_classes))
+            for r in range(0, n_pred_classes):
+                for c in range(0,n_GT_classes):
                     this_confmat[r,c] = sum((y == r) & (predicted_class == c))
 
             # zScore
@@ -388,7 +388,7 @@ def save_model_generalizability(trainer, model_unique_name):
             _ = ax.set_yticklabels([v for v in classes_decoder.values()])
             _ = ax.set_xlabel("Predicted Label")
             _ = ax.set_ylabel("True Label")
-            _ = fig.suptitle('Best Model - ' + k + " - Custom metric = " +str(metrics[k+ "_dist"])) 
+            _ = fig.suptitle('Best Model - ' + k + " - Custom metric = " +str(metrics["distance_"+k])) 
             plt.savefig(thisPath.joinpath('confusionMatrix_' + k + '.pdf'))
 
             # write

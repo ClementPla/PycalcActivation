@@ -14,8 +14,8 @@ def objective(config, is_regression, sweep_id):
     model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id)
     n_epoch = 500
     trainer.train(n_epoch)
-    metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name)
-    metrics = save_model_generalizability(trainer, model_unique_name)
+    metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name, sweep_id)
+    metrics = save_model_generalizability(trainer, model_unique_name, sweep_id)
     if not is_regression:
         metric_to_max = (metric_test + metrics["accuracy_SL"] + \
                         metrics["accuracy_OT3"] + metrics["accuracy_P14"] + \
@@ -41,7 +41,7 @@ def main(project_name, is_regression, sweep_id):
 sweep_configuration = {
     "method": "random",# "bayes",
     "metric": {
-        "goal": "minimize", 
+        "goal": "maximize", 
         "name": "metric_to_max"},
     "parameters": {
         "whichDataset" : {"values": ["ratio", "ratioNorm", "indiv"]},
@@ -66,4 +66,4 @@ sweep_configuration = {
 
 sweep_id = wandb.sweep(sweep=sweep_configuration, project=project_name)
 
-wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression, sweep_id = sweep_id), count=500)
+wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression, sweep_id = sweep_id), count=1000)

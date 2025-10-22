@@ -22,28 +22,29 @@ elif gethostname() == 'HMR-BLOOD':
 
 config = {
         "whichDataset" : "ratioNorm",
-        "whichDisplacement" : "displacement",
+        "whichDisplacement" : "xyPosition",
         "replace_nan_by_min" :True,
         "remove_mean": False,
-        "whichFFT" : False,
+        "whichFFT" : True,
         "numRNN" : 1,
-        "sizeRNN": 16,
-        "bidir" : True,
-        "numFC": 1,
+        "sizeRNN": 8,
+        "bidir" : False,
+        "numFC": 2,
         "sizeFC" :  16,
-        "dropout" : 0.2,
-        "weighted" : True,
+        "dropout" : 0.05,
+        "weighted" : False,
         "customLoss" : False,
         "initial_lr": 0.001,
-        "weight_decay": 1e-4,
+        "weight_decay": 0.0001,
         "batch_size": 1024,
         }
-
-is_regression = True
-model_unique_name, trainer = setupTrainer(config, is_regression)
+sweep_id = ""
+is_regression = False
+model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id)
 n_epoch = 50
 trainer.train(n_epoch)
-metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name)
+metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name,  sweep_id)
+metrics = save_model_generalizability(trainer, model_unique_name, sweep_id)
 
 if is_regression:
     saveFolder = saveFolder.joinpath("regressor")
@@ -52,8 +53,11 @@ else:
 
 from scipy.spatial.distance import cdist
 from sklearn.preprocessing import LabelEncoder
+   # save model
 
+_, saveFolder = getPath(trainer.is_regression, sweep_id)   
 thisPath = saveFolder.joinpath(model_unique_name)
+
 trainer.load_best()
 metrics = {}
 
@@ -79,7 +83,15 @@ this_dict = {
 #     "OT3" : np.array([[0.6,1.0,0,0.3],[0.6,1.0,0,0.3]]),
 #     "conc" : np.array([[1.0,0.6,0.3,0],[1.0,0.6,0.3,0],[1.0,0.6,0.3,0],[1.0,0.6,0.3,0]]),
 # }
-from scipy.interpolate import interp1d
+
+accuracy_matrix = {
+    "OTI" : np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0], [0,0,0,1]]),
+    "SL" : np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0], [0,0,0,1]]),
+    "P14" : np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0]]),
+    "OT3" : np.array([[0,1,0,0],[0,1,0,0]]),
+    "conc" : np.array([[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]]),
+}
+
 encoder = LabelEncoder()
 for k in trainer.dataset.f.all_data.keys():
     x = trainer.dataset.f.all_data[k]["x"]
@@ -96,13 +108,13 @@ for k in trainer.dataset.f.all_data.keys():
 
         # distance metrics
         this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)
-        metrics.update({k+"_dist": this_metric}) # need to min (distance to target)
+        metrics.update({"distance_" + k : this_metric}) # need to min (distance to target)
 
         # fScore metrics
         f = myFScore()
         f.update(preds = torch.Tensor(y_pred), target = torch.Tensor(classes_encoded))
-        metrics.update({k+"_fScore": 1/f.compute().numpy()}) # need to min ( inverse of FScore)
-        
+        metrics.update({"fScore_" + k : f.compute().numpy()}) # need to max (FScore)
+
         # relative weighted distance
         original_refs = [np.log10(this_dict[v]) for v in ["N4", "Q4", "Q4H7", "T4"]]
         xval, yval = trainer.dataset.test_batch(True)
@@ -112,41 +124,44 @@ for k in trainer.dataset.f.all_data.keys():
         y_interp = interp_func(y.cpu().numpy())
         
         this_interp_distance = np.mean(np.abs(y_interp - y_pred), axis = 0)
-        metrics.update({"weighted_distance_" + k: this_interp_distance}) # need to min (distance to target)
+        metrics.update({"weighted_distance_" + k: this_interp_distance}) 
 
-                # plot distribution
+        # plot distribution
         fig = plt.figure()
         for cls in apl_classes:
             _ = plt.hist(y_pred[classes_encoded == cls], 100, alpha=0.5, label=f"Class {classes_decoder[cls]}", density=True)
             _ = plt.legend()
             this_x = interp_func(np.log10(this_dict[classes_decoder[cls]]))
             _ = plt.plot([this_x, this_x], [0,1])
-        _ = fig.suptitle('Best Model - ' + k + "Fscore = " + str(f.compute().numpy())) 
-        
+        _ = fig.suptitle('Best Model - ' + k + " - Fscore = " + str(f.compute().numpy())) 
+        _ = plt.legend()
         plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
 
-
-
     else:
-        # generate cost matrix 
-        GT = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
-        pred = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data[k]["mapping"].values()])
-        this_cost_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
-
         # model predicion on this dataset
         y_pred = trainer.predict(x)
         predicted_class = y_pred.argmax(dim = 1)
-        
-        # calculate this metric
-        this_metrics = np.mean(this_cost_matrix[y.cpu(),predicted_class.cpu()])
-        metrics.update({k + "_dist": this_metrics})   # need to min (distance to target)
+
+        # generate cost matrix 
+        GT = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
+        pred = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data[k]["mapping"].values()])
+        this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
+        this_accuracy_matrix = accuracy_matrix[k]
+    
+        # calculate distance metric
+        this_distance = np.mean(this_distance_matrix[y.cpu(),predicted_class.cpu()])
+        metrics.update({"distance_" + k : this_distance})   # need to min (distance to target)
+
+        # calculate accuracy metric
+        this_accuracy = np.mean(this_accuracy_matrix[y.cpu(),predicted_class.cpu()])
+        metrics.update({"accuracy_" + k : this_accuracy})  # need to max (distance to target)
 
         # print and write all "confusion matrices"
-        n_pred_classes = len(np.unique(predicted_class.cpu()));
-        n_GT_classes = len(apl_classes)
-        this_confmat = np.zeros((n_GT_classes, n_pred_classes))
-        for r in range(0, n_GT_classes):
-            for c in range(0,n_pred_classes):
+        n_pred_classes = len(pred)
+        n_GT_classes = len(GT)
+        this_confmat = np.zeros((n_pred_classes, n_GT_classes))
+        for r in range(0, n_pred_classes):
+            for c in range(0,n_GT_classes):
                 this_confmat[r,c] = sum((y == r) & (predicted_class == c))
 
         # zScore
@@ -166,7 +181,7 @@ for k in trainer.dataset.f.all_data.keys():
         _ = ax.set_yticklabels([v for v in classes_decoder.values()])
         _ = ax.set_xlabel("Predicted Label")
         _ = ax.set_ylabel("True Label")
-        _ = fig.suptitle('Best Model - ' + k + " - Custom metric = " +str(metrics[k+ "_dist"])) 
+        _ = fig.suptitle('Best Model - ' + k + " - Custom metric = " +str(metrics["distance_"+k])) 
         plt.savefig(thisPath.joinpath('confusionMatrix_' + k + '.pdf'))
 
         # write
@@ -179,6 +194,3 @@ for k in trainer.dataset.f.all_data.keys():
         write_confmat = np.column_stack((np.concatenate(([' '], labels_GT)), write_confmat))
         np.savetxt(thisPath.joinpath('confusionMatrixZScore_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
 
-metric_to_min = sum([metrics[k] for k in ["SL_dist", "P14_dist", "OT3_dist"]]) # need to min
-if is_regression:
-    metric_to_min += sum([metrics[k] for k in ["SL_fScore", "P14_fScore", "OT3_fScore"]])
