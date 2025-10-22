@@ -15,18 +15,23 @@ def objective(config, is_regression):
     n_epoch = 500
     trainer.train(n_epoch)
     metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name)
-    metrics, metric_to_max = save_model_generalizability(trainer, model_unique_name)
+    metrics = save_model_generalizability(trainer, model_unique_name)
+
+    metric_to_min = sum([metrics[k] for k in ["SL_dist", "P14_dist", "OT3_dist"]]) # need to min
+    if is_regression:
+        metric_to_min += 1000*sum([metrics[k] for k in ["SL_fScore", "P14_fScore", "OT3_fScore"]])
+        
     torch.cuda.empty_cache()    
     del trainer
-    return model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_max
+    return model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_min
 
 def main(project_name, is_regression):
     with wandb.init(project=project_name) as run:
-        model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_max = objective(run.config, is_regression)
+        model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_min = objective(run.config, is_regression)
         log_dict = {   "metric_train": metric_train,
                     "metric_test": metric_test,
                     "metric_val": metric_val, 
-                    "metric_to_max": metric_to_max,
+                    "metric_to_min": metric_to_min,
                     "model_unique_name": model_unique_name}
         log_dict.update(metrics)
         run.log(log_dict)
@@ -34,8 +39,8 @@ def main(project_name, is_regression):
 sweep_configuration = {
     "method": "bayes",
     "metric": {
-        "goal": "maximize", 
-        "name": "metric_to_max"},
+        "goal": "minimize", 
+        "name": "metric_to_min"},
     "parameters": {
         "whichDataset" : {"values": ["ratio", "ratioNorm", "indiv"]},
         "whichDisplacement" : {"values": ["displacement", "xyPosition", "None"]},

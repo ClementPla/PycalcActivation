@@ -305,12 +305,12 @@ def save_model_generalizability(trainer, model_unique_name):
 
             # distance metrics
             this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)
-            metrics.update({k+"_dist": 1/this_metric}) # need to max (inverse of distance to target)
+            metrics.update({k+"_dist": this_metric}) # need to min (distance to target)
 
             # fScore metrics
             f = myFScore()
             f.update(preds = torch.Tensor(y_pred), target = torch.Tensor(classes_encoded))
-            metrics.update({k+"_fScore": f.compute().numpy()}) # need to max (FScore)
+            metrics.update({k+"_fScore": f.compute().numpy()}) # need to min (inverse of FScore)
 
             # plot distribution
             fig = plt.figure()
@@ -319,7 +319,6 @@ def save_model_generalizability(trainer, model_unique_name):
             _ = fig.suptitle('Best Model - ' + k + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
             plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
-
 
         else:
             # generate cost matrix 
@@ -333,7 +332,7 @@ def save_model_generalizability(trainer, model_unique_name):
             
             # calculate this metric
             this_metrics = np.mean(this_cost_matrix[y.cpu(),predicted_class.cpu()])
-            metrics.update({k + "_dist": 1/ this_metrics})   # need to max (inverse of distance to target)
+            metrics.update({k + "_dist": this_metrics})   # need to min (distance to target)
 
             # print and write all "confusion matrices"
             n_pred_classes = len(np.unique(predicted_class.cpu()));
@@ -373,6 +372,4 @@ def save_model_generalizability(trainer, model_unique_name):
             write_confmat = np.column_stack((np.concatenate(([' '], labels_GT)), write_confmat))
             np.savetxt(thisPath.joinpath('confusionMatrixZScore_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
 
-    metric_to_max = sum([1/v if k == "conc_fScore" else v for k, v in metrics.items()]) # need to max
-
-    return metrics, metric_to_max
+    return metrics

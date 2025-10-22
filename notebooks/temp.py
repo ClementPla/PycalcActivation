@@ -39,12 +39,16 @@ config = {
         "batch_size": 1024,
         }
 
-is_regression = False
+is_regression = True
 model_unique_name, trainer = setupTrainer(config, is_regression)
 n_epoch = 50
 trainer.train(n_epoch)
 metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name)
 
+if is_regression:
+    saveFolder = saveFolder.joinpath("regressor")
+else:
+    saveFolder = saveFolder.joinpath("classifier")
 
 from scipy.spatial.distance import cdist
 from sklearn.preprocessing import LabelEncoder
@@ -92,12 +96,12 @@ for k in trainer.dataset.f.all_data.keys():
 
         # distance metrics
         this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)
-        metrics.update({k+"_dist": 1/this_metric}) # need to max (inverse of distance to target)
+        metrics.update({k+"_dist": this_metric}) # need to min (distance to target)
 
         # fScore metrics
         f = myFScore()
         f.update(preds = torch.Tensor(y_pred), target = torch.Tensor(classes_encoded))
-        metrics.update({k+"_fScore": f.compute().numpy()}) # need to max (FScore)
+        metrics.update({k+"_fScore": 1/f.compute().numpy()}) # need to min ( inverse of FScore)
 
         # plot distribution
         fig = plt.figure()
@@ -120,7 +124,7 @@ for k in trainer.dataset.f.all_data.keys():
         
         # calculate this metric
         this_metrics = np.mean(this_cost_matrix[y.cpu(),predicted_class.cpu()])
-        metrics.update({k + "_dist": 1/ this_metrics})   # need to max (inverse of distance to target)
+        metrics.update({k + "_dist": this_metrics})   # need to min (distance to target)
 
         # print and write all "confusion matrices"
         n_pred_classes = len(np.unique(predicted_class.cpu()));
@@ -135,11 +139,12 @@ for k in trainer.dataset.f.all_data.keys():
 
         # plot
         fig, ax = plt.subplots()    
-        _ = ax.imshow(this_confmat_norm, cmap='Blues') 
+        _ = ax.imshow(this_confmat_norm, cmap='magma') 
+        cmap_reversed = matplotlib.colormaps.get_cmap('magma_r')
         for i in range(this_confmat.shape[0]):
             for j in range(this_confmat.shape[1]):
                 text = ax.text(j, i, this_confmat[i, j],
-                            ha="center", va="center", color="black")
+                            ha="center", va="center", color = cmap_reversed(this_confmat_norm[i, j]))
         _ = ax.set_xticks(np.arange(this_confmat.shape[1]))
         _ = ax.set_yticks(np.arange(this_confmat.shape[0]))
         _ = ax.set_xticklabels([v for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()]) 
@@ -159,4 +164,6 @@ for k in trainer.dataset.f.all_data.keys():
         write_confmat = np.column_stack((np.concatenate(([' '], labels_GT)), write_confmat))
         np.savetxt(thisPath.joinpath('confusionMatrixZScore_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
 
-metric_to_max = sum([1/v for v in metrics.values()]) # need to max
+metric_to_min = sum([metrics[k] for k in ["SL_dist", "P14_dist", "OT3_dist"]]) # need to min
+if is_regression:
+    metric_to_min += sum([metrics[k] for k in ["SL_fScore", "P14_fScore", "OT3_fScore"]])
