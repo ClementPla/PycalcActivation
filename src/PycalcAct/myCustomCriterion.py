@@ -67,8 +67,8 @@ class myFScore(Metric):
         target = target.detach().cpu()
 
         # Convert to list of tensors
-        self.preds.extend(preds.tolist())
-        self.target.extend(target.tolist())
+        self.preds.extend(preds.detach().tolist())
+        self.target.extend(target.detach().tolist())
 
     def compute(self) -> Tensor:
         # Convert lists to numpy arrays
@@ -82,7 +82,13 @@ class myFScore(Metric):
         groups = [all_preds[all_targets == cls] for cls in all_classes]
 
         # Perform one-way ANOVA
-        f, _ = f_oneway(*groups)
+        
+        if all(np.all(group == group[0]) for group in groups):
+            f = 0.0  # or some default value
+        else:
+            f, _ = f_oneway(*groups)
+            if np.isnan(f) or np.isinf(f):
+                f = 0.0
 
         # Return F-score as tensor
-        return torch.tensor(f if not np.isnan(f) else 0.0, dtype=torch.float32)
+        return torch.tensor(f, dtype=torch.float32)

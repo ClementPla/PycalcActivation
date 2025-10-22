@@ -6,13 +6,12 @@ import torch
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.utils.class_weight import compute_class_weight
 
-
 class FromLegendFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression,augment_gt):
+    def __init__(self, csv_path, customFilter, is_regression):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
-        df = pd.read_csv(datapath, header=None)
+        df = pd.read_csv(datapath, header=None, low_memory=False)
 
         col_ageSpe = 0
         col_activated = 2
@@ -38,13 +37,13 @@ class FromLegendFileCSV:
         myDay = pd.DataFrame([d for d in df[col_customFilter]])
         if customFilter == None:
             filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
-                           (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
-                           ([item in ["N4", "Q4", "T4", "Q4H7"] for item in df[col_classesAPL]])
+                           (df[col_peptide] == "OVA") & (df[col_conc] == "-6") & 
+                           (df[col_classesAPL].isin(["N4", "Q4", "T4", "Q4H7"]))
                            & (df[col_user] == "ST")).values
         else:
             filter_bool = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
-                           (df[col_peptide] == "OVA") & (df[col_conc] == -6) & 
-                           ([item in ["N4", "Q4", "T4", "Q4H7"] for item in df[col_classesAPL]]) 
+                           (df[col_peptide] == "OVA") & (df[col_conc] == "-6") & 
+                           (df[col_classesAPL].isin(["N4", "Q4", "T4", "Q4H7"])) 
                            & (df[col_user] == "ST") & (myDay[0] != customFilter)).values
             
         df = df[filter_bool]
@@ -56,23 +55,12 @@ class FromLegendFileCSV:
         # self.inv_mapping = {key: value for key, value in this_dict.items() if key in unique_classes}
         # self.mapping = {v: k for k, v in self.inv_mapping.items()}
         
-        # self.mapping = {k: v for k, v in enumerate(unique_classes)}
-        
-
         self.data = df.iloc[:, -120:].values
         if is_regression:
             classes_int = np.asarray([this_dict[apl] for apl in classes])
             self.inv_mapping = {key: value for key, value in this_dict.items() if key in unique_classes}
             self.mapping = {v: k for k, v in self.inv_mapping.items()}
-            
-            # if augment_gt == "rand":
-            #     classes_int = [t+(0.5-np.random.rand())*scaling_factor for t in classes_int]
-            # elif augment_gt == "Ca":
-            #     thisData = self.data
-            #     meanCa = np.mean(thisData,2)
-            #     classes_int = classes_int - (meanCa.squeeze()-min(meanCa))/(max(meanCa))-min(meanCa)*scaling_factor
-            #       ## change mapping
-                
+                    
         else:
             classes_int = np.asarray(classes.astype("category").cat.codes)
             self.mapping = {k: v for k, v in enumerate(unique_classes)}
@@ -93,13 +81,13 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression, augment_gt):
+    def __init__(self, csv_path, customFilter, is_regression):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, augment_gt)
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression)
         datas = []
         self.fnames = []
         for p in datapath:
@@ -156,16 +144,14 @@ class Dataset:
         replace_nan_by_min=True,
         customFilter = None,
         forEval = False,
-        is_regression = False,
-        augment_gt = False
+        is_regression = False
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter, is_regression,augment_gt)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter, is_regression, augment_gt)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression)
         self.forEval = forEval
         self.f = f
-        self.augment_gt = augment_gt
         self.features_names = f.features_names
         self.remove_mean = remove_mean
         self.is_regression = is_regression
@@ -228,6 +214,8 @@ class Dataset:
         self.n_classes = len(f.mapping)
 
         if not forEval:
+            print(x[0,0,0:10])
+            print(self.classes_int[0:10])
             train_idx, test_idx = next(sk.split(x, self.classes_int))
 
             self.x_train = x[train_idx]
@@ -350,20 +338,6 @@ class Dataset:
                         self.x_val = x
                     case 2:
                         self.x_test = x
-
-    # def normalize(self):
-    #     for j, x_norm in enumerate(zip([self.x_train, self.x_val, self.x_test], [self.norm_train, self.norm_val, self.norm_test])):
-    #         x = x_norm[0]
-    #         norm = x_norm[1]
-    #         for row, naMFI in zip(x, norm):
-    #                 row = row/naMFI
-    #         match j:
-    #             case 0:
-    #                 self.x_train = x
-    #             case 1:
-    #                 self.x_val = x
-    #             case 2:
-    #                 self.x_test = x
 
     def get_class_count(self, y):
         return np.bincount(y)
