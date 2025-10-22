@@ -21,6 +21,7 @@ import random
 import string
 from scipy.spatial.distance import cdist
 from sklearn.preprocessing import LabelEncoder
+from scipy.interpolate import interp1d
 
 def get_safe_folder_name(config):
     # Convert config to string and hash it
@@ -321,10 +322,24 @@ def save_model_generalizability(trainer, model_unique_name):
             f.update(preds = torch.Tensor(y_pred), target = torch.Tensor(classes_encoded))
             metrics.update({"fScore_" + k : f.compute().numpy()}) # need to max (FScore)
 
+            # relative weighted distance
+            original_refs = [np.log10(this_dict[v]) for v in ["N4", "Q4", "Q4H7", "T4"]]
+            xval, yval = trainer.dataset.test_batch(True)
+            y_pred_val = trainer.predict(xval).cpu().squeeze().numpy()
+            predicted_refs = [np.mean(y_pred_val[yval.cpu().numpy() == v]) for v in original_refs]
+            interp_func = interp1d(original_refs, predicted_refs, kind='linear', fill_value="extrapolate")
+            y_interp = interp_func(y.cpu().numpy())
+            
+            this_interp_distance = np.mean(np.abs(y_interp - y_pred), axis = 0)
+            metrics.update({"weighted_distance_" + k: this_interp_distance}) 
+            
             # plot distribution
             fig = plt.figure()
             for cls in apl_classes:
                 _ = plt.hist(y_pred[classes_encoded == cls], 100, alpha=0.5, label=f"Class {classes_decoder[cls]}", density=True)
+                _ = plt.legend()
+                this_x = interp_func(np.log10(this_dict[classes_decoder[cls]]))
+                _ = plt.plot([this_x, this_x], [0,1])
             _ = fig.suptitle('Best Model - ' + k + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
             plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
