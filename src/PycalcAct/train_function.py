@@ -35,7 +35,7 @@ def get_safe_folder_name(config):
     return f"run_{hash_id}"
 
 
-def getPath(is_regression):
+def getPath(is_regression, sweep_id):
     if gethostname() == 'HM_Lab':
         dataFolder = Path("D:/Ca2-Analysis_McGill/prediction/agAffinity/datasets/dataset_mcgill")
         saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
@@ -49,10 +49,11 @@ def getPath(is_regression):
         saveFolder = saveFolder.joinpath("regressor")
     else:
         saveFolder = saveFolder.joinpath("classifier")
+    saveFolder = saveFolder.joinpath(sweep_id)
     
     return dataFolder, saveFolder
 
-def setupTrainer(config, is_regression):
+def setupTrainer(config, is_regression, sweep_id):
     whichDataset = config["whichDataset"]
     whichDisplacement = config['whichDisplacement']
     replace_nan_by_min = config['replace_nan_by_min']
@@ -70,7 +71,7 @@ def setupTrainer(config, is_regression):
     weight_decay=config['weight_decay']
     batch_size = config['batch_size']
     customFilter = None
-    dataFolder, saveFolder = getPath(is_regression)   
+    dataFolder, saveFolder = getPath(is_regression, sweep_id)   
     
      # create model folder
     model_unique_name = get_safe_folder_name(config)
@@ -289,6 +290,14 @@ def save_model_generalizability(trainer, model_unique_name):
     #     "conc" : np.array([[1.0,0.6,0.3,0],[1.0,0.6,0.3,0],[1.0,0.6,0.3,0],[1.0,0.6,0.3,0]]),
     # }
 
+    accuracy_matrix = {
+        "OTI" : np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0], [0,0,0,1]]),
+        "SL" : np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0], [0,0,0,1]]),
+        "P14" : np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0]]),
+        "OT3" : np.array([[0,1,0,0],[0,1,0,0]]),
+        "conc" : np.array([[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]]),
+    }
+
     encoder = LabelEncoder()
     for k in trainer.dataset.f.all_data.keys():
         x = trainer.dataset.f.all_data[k]["x"]
@@ -305,12 +314,12 @@ def save_model_generalizability(trainer, model_unique_name):
 
             # distance metrics
             this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)
-            metrics.update({k+"_dist": this_metric}) # need to min (distance to target)
+            metrics.update({"distance_" + k : this_metric}) # need to min (distance to target)
 
             # fScore metrics
             f = myFScore()
             f.update(preds = torch.Tensor(y_pred), target = torch.Tensor(classes_encoded))
-            metrics.update({k+"_fScore": f.compute().numpy()}) # need to min (inverse of FScore)
+            metrics.update({"fScore_" + k : f.compute().numpy()}) # need to max (FScore)
 
             # plot distribution
             fig = plt.figure()
@@ -321,18 +330,23 @@ def save_model_generalizability(trainer, model_unique_name):
             plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
 
         else:
-            # generate cost matrix 
-            GT = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
-            pred = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data[k]["mapping"].values()])
-            this_cost_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
-
             # model predicion on this dataset
             y_pred = trainer.predict(x)
             predicted_class = y_pred.argmax(dim = 1)
-            
-            # calculate this metric
-            this_metrics = np.mean(this_cost_matrix[y.cpu(),predicted_class.cpu()])
-            metrics.update({k + "_dist": this_metrics})   # need to min (distance to target)
+
+            # generate cost matrix 
+            GT = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
+            pred = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data[k]["mapping"].values()])
+            this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
+            this_accuracy_matrix = accuracy_matrix[k]
+       
+            # calculate distance metric
+            this_distance = np.mean(this_distance_matrix[y.cpu(),predicted_class.cpu()])
+            metrics.update({"distance_" + k : this_distance})   # need to min (distance to target)
+
+            # calculate accuracy metric
+            this_accuracy = np.mean(this_accuracy_matrix[y.cpu(),predicted_class.cpu()])
+            metrics.update({"accuracy_" + k : this_accuracy})  # need to max (distance to target)
 
             # print and write all "confusion matrices"
             n_pred_classes = len(np.unique(predicted_class.cpu()));

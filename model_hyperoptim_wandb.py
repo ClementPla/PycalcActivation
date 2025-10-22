@@ -10,48 +10,50 @@ if is_regression:
 else:
     project_name = "my-first-sweep-classifier"
 
-def objective(config, is_regression):
-    model_unique_name, trainer = setupTrainer(config, is_regression)
+def objective(config, is_regression, sweep_id):
+    model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id)
     n_epoch = 500
     trainer.train(n_epoch)
     metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name)
     metrics = save_model_generalizability(trainer, model_unique_name)
-
-    metric_to_min = sum([metrics[k] for k in ["SL_dist", "P14_dist", "OT3_dist"]]) # need to min
-    if is_regression:
-        metric_to_min += 1000*sum([metrics[k] for k in ["SL_fScore", "P14_fScore", "OT3_fScore"]])
+    if not is_regression:
+        metric_to_max = (metric_test + metrics["accuracy_SL"] + \
+                        metrics["accuracy_OT3"] + metrics["accuracy_P14"] + \
+                        metrics["accuracy_conc"]) / 5 # average accuracy of all datasets
+    else:
+        metric_to_max = metric_test 
         
     torch.cuda.empty_cache()    
     del trainer
-    return model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_min
+    return model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_max
 
-def main(project_name, is_regression):
+def main(project_name, is_regression, sweep_id):
     with wandb.init(project=project_name) as run:
-        model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_min = objective(run.config, is_regression)
-        log_dict = {   "metric_train": metric_train,
-                    "metric_test": metric_test,
-                    "metric_val": metric_val, 
-                    "metric_to_min": metric_to_min,
-                    "model_unique_name": model_unique_name}
+        model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_max = objective(run.config, is_regression, sweep_id)
+        log_dict = {    "accuracy_train": metric_train,
+                        "accuracy_test": metric_test,
+                        "accuracy_val": metric_val, 
+                        "metric_to_max": metric_to_max,
+                        "model_unique_name": model_unique_name}
         log_dict.update(metrics)
         run.log(log_dict)
         
 sweep_configuration = {
-    "method": "bayes",
+    "method": "random",# "bayes",
     "metric": {
         "goal": "minimize", 
-        "name": "metric_to_min"},
+        "name": "metric_to_max"},
     "parameters": {
         "whichDataset" : {"values": ["ratio", "ratioNorm", "indiv"]},
-        "whichDisplacement" : {"values": ["displacement", "xyPosition", "None"]},
+        "whichDisplacement" : {"values": ["displacement", "xyPosition"]},
         "replace_nan_by_min" : {"values": [True, False]},
         "remove_mean": {"values": [False]},
         "whichFFT" : {"values": [True, False]},
-        "numRNN" : {"values": [1, 2]}, # {"values": [1, 2, 3]}
-        "sizeRNN": {"values": [8, 16, 32]}, #{"values": [8, 16, 32, 64]}
+        "numRNN" : {"values": [1, 2, 3]},
+        "sizeRNN": {"values": [8, 16, 32, 64]},
         "bidir" : {"values": [True, False]},
-        "numFC": {"values": [1, 2]}, # {"values": [1, 2, 3]}
-        "sizeFC" :  {"values": [8, 16, 32]},    #{"values": [8, 16, 32, 64]}
+        "numFC": {"values": [1, 2, 3]},
+        "sizeFC" :  {"values": [8, 16, 32, 64]},
         "dropout" : {"min": 0.05, "max": 0.20},
         "weighted" : {"values": [True, False]},
         "customLoss" : {"values": [False]},
@@ -64,4 +66,4 @@ sweep_configuration = {
 
 sweep_id = wandb.sweep(sweep=sweep_configuration, project=project_name)
 
-wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression), count=200)
+wandb.agent(sweep_id, function=lambda: main(project_name = project_name , is_regression = is_regression, sweep_id = sweep_id), count=500)
