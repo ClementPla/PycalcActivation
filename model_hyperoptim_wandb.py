@@ -21,7 +21,7 @@ def objective(config, is_regression, sweep_id):
                         metrics["accuracy_OT3"] + metrics["accuracy_P14"] + \
                         metrics["accuracy_conc"]) / 5 # average accuracy of all datasets
     else:
-        metric_to_max = metric_test 
+        metric_to_max = metric_test  #
         
     torch.cuda.empty_cache()    
     del trainer

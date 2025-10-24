@@ -121,7 +121,6 @@ class FromLegendFileCSV:
         col_CTFR = 8
         col_customFilter = 9
         col_user = 11
-        # scaling_factor = 0.4
         this_dict = {
                 "N4" : -12.9,
                 "Q4" : -10.9,
