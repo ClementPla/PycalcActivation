@@ -269,20 +269,20 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
     metrics = {}
 
     this_dict = {
-                    "N4" : 2.28e-13,
-                    "Q4" : 7.37e-11,
-                    "T4" : 4.76e-10,
-                    "Q4H7" : 2.46e-9,
-                    "M9" : 2.64e-12,
-                    "L6F" : 1e-8,
-                    "C9" : 5.29e-8,
-                    "OT3_N4" : 2.34e-11,
-                    "OT3_Q4" : 3.92e-12,
-                    "-6" : 2.28e-13,
-                    "-8" : 2.28e-13,
-                    "-10" : 2.28e-13,
-                    "-12" : 2.28e-13,
-                }
+                "N4" : -12.9,
+                "Q4" : -10.9,
+                "T4" : -9.5,
+                "Q4H7" : -8.9,
+                "M9" : -11.7,
+                "L6F" : -8.00,
+                "C9" : -8.04,
+                "OT3_N4" : -10.6,
+                "OT3_Q4" : -11.4,
+                "-6" : -12.9,
+                "-8" : -12.9,
+                "-10" : -12.9,
+                "-12" : -12.9,
+            }
     # cost_matrix = {
     #     "OTI" : np.array([[1.0,0.6,0.3,0],[0.6,1.0,0.6,0.3],[0.3,0.6,1.0,0.6], [0,0.3,0.6,1.0]]),
     #     "SL" : np.array([[1.0,0.6,0.3,0],[0.6,1.0,0.6,0.3],[0.3,0.6,1.0,0.6], [0,0.3,0.6,1.0]]),
@@ -323,7 +323,7 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
             metrics.update({"fScore_" + k : f.compute().numpy()}) # need to max (FScore)
 
             # relative weighted distance
-            original_refs = [np.log10(this_dict[v]) for v in ["N4", "Q4", "Q4H7", "T4"]]
+            original_refs = [this_dict[v] for v in ["N4", "Q4", "Q4H7", "T4"]]
             xval, yval = trainer.dataset.test_batch(True)
             y_pred_val = trainer.predict(xval).cpu().squeeze().numpy()
             predicted_refs = [np.mean(y_pred_val[yval.cpu().numpy() == v]) for v in original_refs]
@@ -338,7 +338,7 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
             for cls in apl_classes:
                 _ = plt.hist(y_pred[classes_encoded == cls], 100, alpha=0.5, label=f"Class {classes_decoder[cls]}", density=True)
                 _ = plt.legend()
-                this_x = interp_func(np.log10(this_dict[classes_decoder[cls]]))
+                this_x = interp_func(this_dict[classes_decoder[cls]])
                 _ = plt.plot([this_x, this_x], [0,1])
             _ = fig.suptitle('Best Model - ' + k + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
@@ -350,8 +350,8 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
             predicted_class = y_pred.argmax(dim = 1)
 
             # generate cost matrix 
-            GT = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
-            pred = np.array([np.log10(this_dict[v]) for v in trainer.dataset.f.all_data[k]["mapping"].values()])
+            GT = np.array([this_dict[v] for v in trainer.dataset.f.all_data["OTI"]["mapping"].values()])
+            pred = np.array([this_dict[v] for v in trainer.dataset.f.all_data[k]["mapping"].values()])
             this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
             this_accuracy_matrix = accuracy_matrix[k]
        

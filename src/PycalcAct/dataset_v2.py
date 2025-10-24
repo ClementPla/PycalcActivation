@@ -123,21 +123,20 @@ class FromLegendFileCSV:
         col_user = 11
         # scaling_factor = 0.4
         this_dict = {
-                "N4" : 2.28e-13,
-                "Q4" : 7.37e-11,
-                "T4" : 4.76e-10,
-                "Q4H7" : 2.46e-9,
-                "M9" : 2.64e-12,
-                "L6F" : 1e-8,
-                "C9" : 5.29e-8,
-                "OT3_N4" : 2.34e-11,
-                "OT3_Q4" : 3.92e-12,
-                "-6" : 2.28e-13,
-                "-8" : 2.28e-13,
-                "-10" : 2.28e-13,
-                "-12" : 2.28e-13,
+                "N4" : -12.9,
+                "Q4" : -10.9,
+                "T4" : -9.5,
+                "Q4H7" : -8.9,
+                "M9" : -11.7,
+                "L6F" : -8.00,
+                "C9" : -8.04,
+                "OT3_N4" : -10.6,
+                "OT3_Q4" : -11.4,
+                "-6" : -12.9,
+                "-8" : -12.9,
+                "-10" : -12.9,
+                "-12" : -12.9,
             }
-        this_dict = {k:np.log10(v) for k,v in this_dict.items()}
         myDay = pd.DataFrame([d for d in df[col_customFilter]])
 
         if customFilter == None:
