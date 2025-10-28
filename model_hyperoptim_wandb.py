@@ -4,6 +4,7 @@ from PycalcAct.train_function import *
 import torch
 
 os.environ['WANDB_API_KEY'] = '73246a79f06da26fb325d763bd90ab7fc81bc9e6'
+
 is_regression = False
 if is_regression:
     project_name = "my-first-sweep-regressor"
@@ -11,11 +12,11 @@ else:
     project_name = "my-first-sweep-classifier"
 
 def objective(config, is_regression, sweep_id):
-    model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id)
+    model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id, model_unique_name=None)
     n_epoch = 500
     trainer.train(n_epoch)
-    metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name, sweep_id)
-    metrics = save_model_generalizability(trainer, model_unique_name, sweep_id)
+    metric_train, metric_val, metric_test, _, _ = save_model_perf(trainer, model_unique_name, sweep_id, save = True)
+    metrics = save_model_generalizability(trainer, model_unique_name, sweep_id, save = True)
     if not is_regression:
         metric_to_max = (metric_test + metrics["accuracy_SL"] + \
                         metrics["accuracy_OT3"] + metrics["accuracy_P14"] + \
@@ -25,6 +26,7 @@ def objective(config, is_regression, sweep_id):
         
     torch.cuda.empty_cache()    
     del trainer
+    
     return model_unique_name, metric_train, metric_val, metric_test, metrics, metric_to_max
 
 def main(project_name, is_regression, sweep_id):

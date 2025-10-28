@@ -54,7 +54,7 @@ def getPath(is_regression, sweep_id):
     
     return dataFolder, saveFolder
 
-def setupTrainer(config, is_regression, sweep_id):
+def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
     whichDataset = config["whichDataset"]
     whichDisplacement = config['whichDisplacement']
     replace_nan_by_min = config['replace_nan_by_min']
@@ -72,10 +72,12 @@ def setupTrainer(config, is_regression, sweep_id):
     weight_decay=config['weight_decay']
     batch_size = config['batch_size']
     customFilter = None
+
     dataFolder, saveFolder = getPath(is_regression, sweep_id)   
     
      # create model folder
-    model_unique_name = get_safe_folder_name(config)
+    if model_unique_name is None:
+        model_unique_name = get_safe_folder_name(config)
     thisPath = saveFolder.joinpath(model_unique_name)
     thisPath.mkdir(parents=True, exist_ok=True)
         
@@ -160,22 +162,23 @@ def setupTrainer(config, is_regression, sweep_id):
     return model_unique_name, trainer
 
 
-def save_model_perf(trainer, model_unique_name, sweep_id):
+def save_model_perf(trainer, model_unique_name, sweep_id, save = True):
     # save model
     _, saveFolder = getPath(trainer.is_regression, sweep_id)   
     thisPath = saveFolder.joinpath(model_unique_name)
     thisModelName = thisPath.joinpath("savedModel.pt")
 
-    torch.save(
-        {
-            "model": trainer.model.state_dict(),
-            "optim": trainer.optim.state_dict(),
-            "scheduler": trainer.scheduler.state_dict() if trainer.scheduler else None,
-            "best": trainer._best_state_dict,
-            "last": trainer._last_state_dict,
-        },
-        Path(thisModelName),
-    )
+    if save:
+        torch.save(
+            {
+                "model": trainer.model.state_dict(),
+                "optim": trainer.optim.state_dict(),
+                "scheduler": trainer.scheduler.state_dict() if trainer.scheduler else None,
+                "best": trainer._best_state_dict,
+                "last": trainer._last_state_dict,
+            },
+            Path(thisModelName),
+        )
         
     # save metrics
     trainer.load_best()
@@ -196,8 +199,8 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
             _, m = trainer.eval(x, y.type(torch.LongTensor).to(trainer.device))
             metrics.append(m)
             thisConfmat.append(np.array(trainer.confmat.compute().cpu(), dtype = str))
-
-    np.save(thisPath.joinpath('metrics.npy'), metrics)
+    if save:
+        np.save(thisPath.joinpath('metrics.npy'), metrics)
 
     with open(thisPath.joinpath("metrics.csv"), mode="w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=["Accuracy", "CohenKappa", "myFScore"])
@@ -207,7 +210,8 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
 
     # save figure
     fig, _ = trainer.test("best", show_confmat=False)
-    fig.savefig(thisPath.joinpath('confusionMatrix_best.pdf'))
+    if save:
+        fig.savefig(thisPath.joinpath('confusionMatrix_best.pdf'))
 
     # save confusion matrix
     thisConfmat = np.array(thisConfmat).reshape(12,4)
@@ -215,7 +219,8 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
     labels3=np.tile(labels, 3)
     writeConfmat = np.column_stack((labels3,thisConfmat))
     writeConfmat = np.vstack((np.concatenate(([' '], labels)), writeConfmat))
-    np.savetxt(thisPath.joinpath('confusionMatrix.csv'), writeConfmat, delimiter=",", fmt='%s')
+    if save:
+        np.savetxt(thisPath.joinpath('confusionMatrix.csv'), writeConfmat, delimiter=",", fmt='%s')
 
     # print regression figure
     allMetrics = []
@@ -234,7 +239,8 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
                 _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}", density = True)
             _ = fig.suptitle('Best Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
-            plt.savefig(thisPath.joinpath('predictionDistribution_best_' + name + '.pdf'))
+            if save:
+                plt.savefig(thisPath.joinpath('predictionDistribution_best_' + name + '.pdf'))
             allMetrics.append(f.compute().numpy())
 
             trainer.load_last()
@@ -246,7 +252,8 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
                 _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}", density = True)
             _ = fig.suptitle('Last Model - ' + name + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
-            plt.savefig(thisPath.joinpath('predictionDistribution_last_' + name + '.pdf'))
+            if save:
+                plt.savefig(thisPath.joinpath('predictionDistribution_last_' + name + '.pdf'))
 
         metric_train = allMetrics[0]
         metric_val = allMetrics[1]
@@ -256,10 +263,10 @@ def save_model_perf(trainer, model_unique_name, sweep_id):
         metric_val = metrics[1]['Accuracy']
         metric_test = metrics[2]['Accuracy']
 
-    return metric_train, metric_val, metric_test
+    return metric_train, metric_val, metric_test, allMetrics, metrics
 
 
-def save_model_generalizability(trainer, model_unique_name, sweep_id):
+def save_model_generalizability(trainer, model_unique_name, sweep_id, save = True):
     # save model
     _, saveFolder = getPath(trainer.is_regression, sweep_id)   
     thisPath = saveFolder.joinpath(model_unique_name)
@@ -342,7 +349,8 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
                 _ = plt.plot([this_x, this_x], [0,1])
             _ = fig.suptitle('Best Model - ' + k + " - Fscore = " + str(f.compute().numpy())) 
             _ = plt.legend()
-            plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
+            if save:
+                plt.savefig(thisPath.joinpath('predictionDistribution_' + k + '.pdf'))
 
         else:
             # model predicion on this dataset
@@ -389,16 +397,19 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id):
             _ = ax.set_xlabel("Predicted Label")
             _ = ax.set_ylabel("True Label")
             _ = fig.suptitle('Best Model - ' + k + " - Custom metric = " +str(metrics["distance_"+k])) 
-            plt.savefig(thisPath.joinpath('confusionMatrix_' + k + '.pdf'))
+            if save:
+                plt.savefig(thisPath.joinpath('confusionMatrix_' + k + '.pdf'))
 
             # write
             labels_pred = np.array(trainer.dataset.labels("OTI"), dtype = str)
             labels_GT = np.array(trainer.dataset.labels(k), dtype = str)
             write_confmat = np.row_stack((labels_pred,this_confmat))
             write_confmat = np.column_stack((np.concatenate(([' '], labels_GT)), write_confmat))
-            np.savetxt(thisPath.joinpath('confusionMatrix_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
+            if save:
+                np.savetxt(thisPath.joinpath('confusionMatrix_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
             write_confmat = np.row_stack((labels_pred,this_confmat_norm))
             write_confmat = np.column_stack((np.concatenate(([' '], labels_GT)), write_confmat))
-            np.savetxt(thisPath.joinpath('confusionMatrixZScore_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
+            if save:
+                np.savetxt(thisPath.joinpath('confusionMatrixZScore_' + k + '.csv'), write_confmat, delimiter=",", fmt='%s')
 
     return metrics
