@@ -71,6 +71,8 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
     initial_lr=config['initial_lr']
     weight_decay=config['weight_decay']
     batch_size = config['batch_size']
+    store_best = config['store_best']
+    loss = config['loss']
     customFilter = None
 
     dataFolder, saveFolder = getPath(is_regression, sweep_id)   
@@ -144,19 +146,26 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
     if customLoss:
         criterion = myCustomCriterion(weight = dataset.weights, device = "cuda", D = D)
 
+    if store_best == None:
+        if is_regression:
+            store_best = 'myFScore'
+        else:
+            store_best = 'Accuracy'
+
     trainer = Trainer(
         dataset,
         model,
         device="cuda",
         batch_size=batch_size,
         criterion= criterion,
-        store_best='myFScore' if is_regression else 'Accuracy',
+        store_best= store_best,
         use_class_weights = weighted,
         is_regression = is_regression,
         regression_bounds_y = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
         regression_bounds_y_pred = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
         initial_lr=initial_lr,
         weight_decay=weight_decay,
+        loss = loss,
     ) 
 
     return model_unique_name, trainer
@@ -318,7 +327,14 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id, save = Tru
 
         if trainer.is_regression:
             # make prediction
-            y_pred = trainer.predict(x).cpu().squeeze().numpy()
+            y_pred = torch.Tensor()
+            batch_size = trainer.batch_size
+            for i in range(0, len(x), batch_size):
+                x_batch = x[i : i + batch_size]
+                with torch.no_grad():
+                    y_pred_batch = trainer.model(x_batch)
+                    y_pred = torch.cat((y_pred, y_pred_batch.cpu()), dim=0)
+            y_pred = y_pred.squeeze().numpy()   
 
             # distance metrics
             this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)

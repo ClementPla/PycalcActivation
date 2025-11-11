@@ -20,26 +20,33 @@ elif gethostname() == 'HMR-BLOOD':
 config = {
         "whichDataset" : "ratioNorm",
         "whichDisplacement" : "xyPosition",
-        "replace_nan_by_min" :True,
+        "replace_nan_by_min" :False,
         "remove_mean": False,
         "whichFFT" : True,
-        "numRNN" : 1,
-        "sizeRNN": 8,
-        "bidir" : False,
-        "numFC": 2,
-        "sizeFC" :  16,
-        "dropout" : 0.05,
-        "weighted" : False,
+        "numRNN" : 3,
+        "sizeRNN": 64,
+        "bidir" : True,
+        "numFC": 3,
+        "sizeFC" :  8,
+        "dropout" : 0.15816701156730234,
+        "weighted" : True,
         "customLoss" : False,
-        "initial_lr": 0.001,
+        "initial_lr": 0.01,
         "weight_decay": 0.0001,
-        "batch_size": 1024,
+        "batch_size": 2048,
+        "store_best": "Accuracy",
+        "loss": "Huber",
         }
+
+weighted:true
+whichDataset:"ratio"
+whichDisplacement:"displacement"
+whichFFT:true
 sweep_id = ""
-is_regression = False
+is_regression = True
 model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id, None)
-n_epoch = 50
-trainer.train(n_epoch)
+n_epoch = 10000
+trainer.train(n_epoch, val_patience=100)
 metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name,  sweep_id, False)
 metrics = save_model_generalizability(trainer, model_unique_name, sweep_id, False)
 

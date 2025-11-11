@@ -32,6 +32,7 @@ class Trainer:
         use_class_weights=True,
         regression_bounds_y=None,
         regression_bounds_y_pred=None,
+        loss = "MSE",
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -41,7 +42,7 @@ class Trainer:
         self.weight_decay = weight_decay
         self.is_regression = is_regression
         self.use_class_weights = use_class_weights
-
+        self.loss = loss
         self.optim = optim if optim else self.default_optimizer()
         self.criterion = criterion if criterion else self.default_criterion()
         self.scheduler = scheduler
@@ -52,7 +53,7 @@ class Trainer:
         self._initial_state_dict = deepcopy(self.model.state_dict())
         self._store_best = store_best
         self.batch_size = batch_size
-
+        
         
         self.metrics = MetricCollection(
             dict(
@@ -78,9 +79,13 @@ class Trainer:
             if self.use_class_weights:
                 return myMSELoss(weights=self.dataset.weights, classes=np.unique(self.dataset.y_train))
             else:
-                return torch.nn.MSELoss()
-                # return torch.nn.L1Loss()
-                # return torch.nn.HuberLoss()
+                match self.loss:
+                    case "MSE":
+                        return torch.nn.MSELoss()
+                    case "L1":
+                        return torch.nn.L1Loss()
+                    case "Huber":
+                        return torch.nn.HuberLoss()
         else:
             if self.use_class_weights:
                 return torch.nn.CrossEntropyLoss(weight=self.dataset.weights).to(self.device)
@@ -159,9 +164,10 @@ class Trainer:
 
     def register_last_state(self):
         self._last_state_dict = deepcopy(self.model.state_dict())
+        # print(Fore.YELLOW + "Last state of the model registered." + Style.RESET_ALL)
 
     @on_keyboard_interrup("register_last_state")
-    def train(self, n_epochs: int, val_every: int = 1, verbose: bool = True, seed=1234):
+    def train(self, n_epochs: int, val_every: int = 1, verbose: bool = True, seed=1234, val_patience: int = 100):
         if self.scheduler is None:
             self.scheduler = self.default_scheduler()(T_max=n_epochs)
             self._initial_scheduler_state_dict = deepcopy(self.scheduler.state_dict())
@@ -195,13 +201,14 @@ class Trainer:
         table.add_column("Loss", color="blue", alignment="right")
         table.add_column("Accuracy", color="green", alignment="right")
         table.add_column("myFScore", color="red", alignment="right")  
-
+        t_since_last_best = 0
         for e in table(
             range(n_epochs),
             total=n_epochs,
             description="Epoch",
             show_eta=True,
         ):
+            
             idx = torch.randperm(x.shape[0], device=x.device)
             x = x[idx]
             y = y[idx]
@@ -248,7 +255,13 @@ class Trainer:
                         table.update("Accuracy", scores["Accuracy"].item() * 100, color="green")
                         table.update("myFScore", scores["myFScore"].item(), color="red")
 
+                    t_since_last_best = 0
                     table.next_row()
+            
+            t_since_last_best += 1
+            if t_since_last_best >= val_patience:
+                print(Fore.RED + "Early stopping: no improvement for" + str(val_patience) + " epochs." + Style.RESET_ALL)
+                break
 
         table.close()
         self.register_last_state()
