@@ -18,8 +18,8 @@ elif gethostname() == 'HMR-BLOOD':
     saveFolder = Path("D:/sebastien/PycalcActivation/models/round3")
     
 config = {
-        "whichDataset" : "ratioNorm",
-        "whichDisplacement" : "xyPosition",
+        "whichDataset" : "ratio",
+        "whichDisplacement" : "displacement",
         "replace_nan_by_min" :False,
         "remove_mean": False,
         "whichFFT" : True,
@@ -38,16 +38,12 @@ config = {
         "loss": "Huber",
         }
 
-weighted:true
-whichDataset:"ratio"
-whichDisplacement:"displacement"
-whichFFT:true
 sweep_id = ""
 is_regression = True
 model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id, None)
 n_epoch = 10000
 trainer.train(n_epoch, val_patience=100)
-metric_train, metric_val, metric_test = save_model_perf(trainer, model_unique_name,  sweep_id, False)
+metric_train, metric_val, metric_test, a, b = save_model_perf(trainer, model_unique_name,  sweep_id, False)
 metrics = save_model_generalizability(trainer, model_unique_name, sweep_id, False)
 
 if is_regression:
@@ -108,7 +104,18 @@ for k in trainer.dataset.f.all_data.keys():
 
     if trainer.is_regression:
         # make prediction
-        y_pred = trainer.predict(x).cpu().squeeze().numpy()
+        y_pred = torch.Tensor()
+        batch_size = trainer.batch_size
+        f = myFScore()
+        for i in range(0, len(x), batch_size):
+            x_batch = x[i : i + batch_size]
+            with torch.no_grad():
+                y_pred_batch = trainer.model(x_batch)
+                y_pred = torch.cat((y_pred, y_pred_batch.cpu()), dim=0)
+                f.update(preds = y_pred_batch.cpu(), target = y[i : i + batch_size].cpu())
+        y_pred = y_pred.squeeze().numpy()   
+        test = f.compute()
+                
 
         # distance metrics
         this_metric = np.mean(np.abs(y.cpu().numpy() - y_pred), axis = 0)

@@ -54,7 +54,7 @@ def getPath(is_regression, sweep_id):
     
     return dataFolder, saveFolder
 
-def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
+def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50_path = "D:\sebastien\PycalcActivation\EC50.csv"):
     whichDataset = config["whichDataset"]
     whichDisplacement = config['whichDisplacement']
     replace_nan_by_min = config['replace_nan_by_min']
@@ -102,7 +102,12 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
     else:
         csv_pos_path = None
         position_to_displacement = False
-
+        
+    EC50 = pd.read_csv("EC50.csv", index_col=None , header=None)
+    EC50 = {
+        (row.iloc[0] if pos < 9 else int(row.iloc[0])): row.iloc[1]
+        for pos, (_, row) in enumerate(EC50.iterrows())
+    }
     dataset = Dataset(
         csv_path = csv_path,
         csv_pos_path=csv_pos_path,  # Optional
@@ -111,6 +116,7 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None):
         replace_nan_by_min=replace_nan_by_min,
         customFilter = customFilter, 
         is_regression=is_regression, #True,
+        EC50 = EC50
         # Convert the x, y position to a single displacement value (sqrt((x(t+1)-x(t))^2 + (y(t+1)-y(t))^2)
         )
 

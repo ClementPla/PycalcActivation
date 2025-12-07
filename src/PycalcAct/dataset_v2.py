@@ -108,7 +108,7 @@ def concatenate_postion_data(f, xxx, yyy, position_to_displacement):
     return f
 
 class FromLegendFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression, EC50):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
@@ -121,21 +121,7 @@ class FromLegendFileCSV:
         col_CTFR = 8
         col_customFilter = 9
         col_user = 11
-        this_dict = {
-                "N4" : -12.9,
-                "Q4" : -10.9,
-                "T4" : -9.5,
-                "Q4H7" : -8.9,
-                "M9" : -11.7,
-                "L6F" : -8.00,
-                "C9" : -8.04,
-                "OT3_N4" : -10.6,
-                "OT3_Q4" : -11.4,
-                "-6" : -12.9,
-                "-8" : -12.9,
-                "-10" : -12.9,
-                "-12" : -12.9,
-            }
+        this_dict = EC50
         myDay = pd.DataFrame([d for d in df[col_customFilter]])
 
         if customFilter == None:
@@ -180,13 +166,13 @@ class FromLegendFileCSV:
         return [f"Normalized Ratio {self.datapath.stem}"]
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression, EC50):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression) ####
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, EC50) ####
         self.all_data = concatenate_other_data(self.flegend.all_data, datapath) ####
 
     @property
@@ -238,6 +224,7 @@ class Dataset:
     def __init__(
         self,
         csv_path,
+        EC50,
         csv_pos_path=None,
         position_to_displacement=True,
         test_size=0.2,
@@ -250,9 +237,9 @@ class Dataset:
     ):
         # Load data from file
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter, is_regression)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression, EC50)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter, is_regression)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression, EC50)
         
         # transfer attributes of dataset to self
         self.f = f 

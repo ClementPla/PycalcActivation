@@ -7,7 +7,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.utils.class_weight import compute_class_weight
 
 class FromLegendFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression, EC50):
         self.datapath = Path(csv_path)
         datapath = Path(csv_path)
 
@@ -81,13 +81,13 @@ class FromLegendFileCSV:
 
 
 class FromMultiFileCSV:
-    def __init__(self, csv_path, customFilter, is_regression):
+    def __init__(self, csv_path, customFilter, is_regression, EC50):
         assert isinstance(csv_path, list), "csv_path should be a list of paths"
         datapath = [Path(p) for p in csv_path]
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression)
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, NoEC50ne)
         datas = []
         self.fnames = []
         for p in datapath:
@@ -135,6 +135,7 @@ class Dataset:
     def __init__(
         self,
         csv_path,
+        EC50,
         csv_pos_path=None,
         position_to_displacement=True,
         test_size=0.2,
@@ -147,9 +148,9 @@ class Dataset:
         is_regression = False
     ):
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter, is_regression)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression, EC50)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter, is_regression)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression, EC50)
         self.forEval = forEval
         self.f = f
         self.features_names = f.features_names
