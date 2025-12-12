@@ -15,7 +15,7 @@ os.environ['WANDB_API_KEY'] = '73246a79f06da26fb325d763bd90ab7fc81bc9e6'
 api = wandb.Api()
 
 # Project is specified by <entity/project-name>
-is_regression = False
+is_regression = True
 if is_regression:
     runs = api.runs("sebthis-mcgill-university/my-first-sweep-regressor")
 else:
@@ -57,103 +57,104 @@ if not os.path.exists(tableFolder.joinpath("project.csv")):
             
         # .name is the human-readable name of th e run.
         name_list.append(run.name)
-
+        test = run.sweep
         model_unique_name = summary['model_unique_name']
-        sweep_id =  run.sweep.id    
+        sweep_id =  run.sweep.id
+        if not isinstance(sweep_id, str):
+            print(f"Run {run.name} has no sweep, skipping...")
+            continue
+        
         _, saveFolder = getPath(is_regression, sweep_id)    
         thisModelPath = os.path.join(saveFolder, model_unique_name)
 
         if os.path.getsize(thisModelPath) == 0:
             print(f"Model: {model_unique_name} has no saved model.")
         else:
-            if not is_regression:
-                # load already calculated metrics
-                if 'accuracy_test' in summary.keys():
-                    acc_OTI.append(summary['accuracy_test'])
-                else:
-                    acc_OTI.append(summary['metric_test'])
-                # compute synthetic EC50 from confusion matrix
-                    # load confusion matrix
-                OTI_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix.csv"), index_col=0, header = 0).to_numpy(dtype = float)
-                OTI_conf = OTI_conf[-4:, :]
-                OTI_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix.csv"), index_col=0, header = 0).index.to_list()
-                OTI_conf_row_label = OTI_conf_row_label[-4:]
-                P14_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_P14.csv"), index_col=0, header = 0).to_numpy(dtype = float)
-                P14_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_P14.csv"), index_col=0, header = 0).index.to_list()
-                OT3_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).to_numpy(dtype = float)
-                OT3_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).index.to_list()
-                conc_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_conc.csv"), index_col=0, header = 0).to_numpy(dtype = float)
-                conc_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_conc.csv"), index_col=0, header = 0).index.to_list() 
-                prediction_labels = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).columns.to_list()  
-                SL_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_SL.csv"), index_col=0, header = 0).to_numpy(dtype = float)
-                SL_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_SL.csv"), index_col=0, header = 0).index.to_list()
+            # load already calculated metrics
+            if 'accuracy_test' in summary.keys():
+                acc_OTI.append(summary['accuracy_test'])
+            else:
+                acc_OTI.append(summary['metric_test'])
+            # compute synthetic EC50 from confusion matrix
+                # load confusion matrix
+            OTI_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix.csv"), index_col=0, header = 0).to_numpy(dtype = float)
+            OTI_conf = OTI_conf[-4:, :]
+            OTI_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix.csv"), index_col=0, header = 0).index.to_list()
+            OTI_conf_row_label = OTI_conf_row_label[-4:]
+            P14_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_P14.csv"), index_col=0, header = 0).to_numpy(dtype = float)
+            P14_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_P14.csv"), index_col=0, header = 0).index.to_list()
+            OT3_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).to_numpy(dtype = float)
+            OT3_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).index.to_list()
+            conc_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_conc.csv"), index_col=0, header = 0).to_numpy(dtype = float)
+            conc_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_conc.csv"), index_col=0, header = 0).index.to_list() 
+            prediction_labels = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_OT3.csv"), index_col=0, header = 0).columns.to_list()  
+            SL_conf = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_SL.csv"), index_col=0, header = 0).to_numpy(dtype = float)
+            SL_conf_row_label = pd.read_csv(os.path.join(thisModelPath, "confusionMatrix_SL.csv"), index_col=0, header = 0).index.to_list()
 
 
-                iterable = [(OTI_conf, OTI_conf_row_label, "OTI"),(P14_conf, P14_conf_row_label, "P14"),\
-                            (OT3_conf,OT3_conf_row_label, "OT3"), (conc_conf, conc_conf_row_label, "conc"),\
-                                (SL_conf, SL_conf_row_label, "SL")]
+            iterable = [(OTI_conf, OTI_conf_row_label, "OTI"),(P14_conf, P14_conf_row_label, "P14"),\
+                        (OT3_conf,OT3_conf_row_label, "OT3"), (conc_conf, conc_conf_row_label, "conc"),\
+                            (SL_conf, SL_conf_row_label, "SL")]
 
-                row_ec50_dist = {}
-                row_SD = {}
-                mean_SD = {}
-                dist = {}
-                row_ec50 = {}   
-                ec50_dist = {}
-                spearman_corr = {}
-                for conf, labels, name in iterable:
-                    # Synthetic EC50 on each row
-                    this_apl_ec50 = np.array([EC50[label] for label in prediction_labels])
-                    row_ec50.update({name:np.dot(conf, this_apl_ec50)/np.sum(conf, axis = 1)})
-                    row_ec50_dist.update({name : np.abs([EC50[label] for label in labels] - row_ec50[name])})
-                    ec50_dist.update({name:np.average(row_ec50_dist[name], weights = np.sum(conf, axis = 1))})
+            row_ec50_dist = {}
+            row_SD = {}
+            mean_SD = {}
+            dist = {}
+            row_ec50 = {}   
+            ec50_dist = {}
+            spearman_corr = {}
+            for conf, labels, name in iterable:
+                # Synthetic EC50 on each row
+                this_apl_ec50 = np.array([EC50[label] for label in prediction_labels])
+                row_ec50.update({name:np.dot(conf, this_apl_ec50)/np.sum(conf, axis = 1)})
+                row_ec50_dist.update({name : np.abs([EC50[label] for label in labels] - row_ec50[name])})
+                ec50_dist.update({name:np.average(row_ec50_dist[name], weights = np.sum(conf, axis = 1))})
 
-                    # distance metric
-                    GT = np.array([EC50[v] for v in prediction_labels])
-                    pred = np.array([EC50[v] for v in labels])
-                    this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
-                    # transpose this distnace matrix to have shape (num labels, num prediction labels)
-                        # do matrix multiplication of this row by EC50 values of the colomns labels
-                    dist.update({name:np.sum(conf*this_distance_matrix)/np.sum(conf)})
+                # distance metric
+                GT = np.array([EC50[v] for v in prediction_labels])
+                pred = np.array([EC50[v] for v in labels])
+                this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
+                # transpose this distnace matrix to have shape (num labels, num prediction labels)
+                    # do matrix multiplication of this row by EC50 values of the colomns labels
+                dist.update({name:np.sum(conf*this_distance_matrix)/np.sum(conf)})
 
-                    # Metric to measure spread of the predictions
-                    row_SD.update({name:np.max(conf/np.sum(conf, axis = 1).reshape(-1,1), axis = 1)})
-                    mean_SD.update({name:np.average(row_SD[name])})
+                # Metric to measure spread of the predictions
+                row_SD.update({name:np.max(conf/np.sum(conf, axis = 1).reshape(-1,1), axis = 1)})
+                mean_SD.update({name:np.average(row_SD[name])})
 
-                    # spearman correlation between predicted and actual EC50 values
-                    true_idx = np.repeat([EC50[label] for label in labels], len(prediction_labels))
-                    pred_idx = np.tile([EC50[label] for label in prediction_labels], len(labels))
-                    counts = conf.flatten().astype(int)
-                    y_true = np.repeat(true_idx, counts)
-                    y_pred = np.repeat(pred_idx, counts)
+                # spearman correlation between predicted and actual EC50 values
+                true_idx = np.repeat([EC50[label] for label in labels], len(prediction_labels))
+                pred_idx = np.tile([EC50[label] for label in prediction_labels], len(labels))
+                counts = conf.flatten().astype(int)
+                y_true = np.repeat(true_idx, counts)
+                y_pred = np.repeat(pred_idx, counts)
 
-                    if name != "conc":  # conc has some classes with zero counts leading to constant arrays
-                        spearman, _= stats.spearmanr(y_true, y_pred)
-                        spearman_corr.update({name:spearman})
-                    else:   
-                        spearman_corr.update({name:np.nan})
+                if name != "conc":  # conc has some classes with zero counts leading to constant arrays
+                    spearman, _= stats.spearmanr(y_true, y_pred)
+                    spearman_corr.update({name:spearman})
+                else:   
+                    spearman_corr.update({name:np.nan})
 
-                distance_OTI.append(dist['OTI'])
-                distance_P14.append(dist['P14'])
-                distance_OT3.append(dist['OT3'])
-                distance_conc.append(dist['conc'])
-                distance_SL.append(dist['SL'])
-                synthetic_EC50_OTI.append(ec50_dist['OTI'])
-                synthetic_EC50_P14.append(ec50_dist['P14'])
-                synthetic_EC50_OT3.append(ec50_dist['OT3'])
-                synthetic_EC50_conc.append(ec50_dist['conc'])
-                synthetic_EC50_SL.append(ec50_dist['SL'])
-                SD_P14.append(mean_SD['P14'])
-                SD_OT3.append(mean_SD['OT3'])   
-                SD_OTI.append(mean_SD['OTI'])
-                SD_conc.append(mean_SD['conc'])
-                SD_SL.append(mean_SD['SL'])
-                spearman_corr_OTI.append(spearman_corr['OTI'])
-                spearman_corr_P14.append(spearman_corr['P14'])
-                spearman_corr_OT3.append(spearman_corr['OT3'])
-                spearman_corr_conc.append(spearman_corr['conc'])
-                spearman_corr_SL.append(spearman_corr['SL'])
-
-
+            distance_OTI.append(dist['OTI'])
+            distance_P14.append(dist['P14'])
+            distance_OT3.append(dist['OT3'])
+            distance_conc.append(dist['conc'])
+            distance_SL.append(dist['SL'])
+            synthetic_EC50_OTI.append(ec50_dist['OTI'])
+            synthetic_EC50_P14.append(ec50_dist['P14'])
+            synthetic_EC50_OT3.append(ec50_dist['OT3'])
+            synthetic_EC50_conc.append(ec50_dist['conc'])
+            synthetic_EC50_SL.append(ec50_dist['SL'])
+            SD_P14.append(mean_SD['P14'])
+            SD_OT3.append(mean_SD['OT3'])   
+            SD_OTI.append(mean_SD['OTI'])
+            SD_conc.append(mean_SD['conc'])
+            SD_SL.append(mean_SD['SL'])
+            spearman_corr_OTI.append(spearman_corr['OTI'])
+            spearman_corr_P14.append(spearman_corr['P14'])
+            spearman_corr_OT3.append(spearman_corr['OT3'])
+            spearman_corr_conc.append(spearman_corr['conc'])
+            spearman_corr_SL.append(spearman_corr['SL'])
 
     runs_df = pd.DataFrame({
         "name": name_list, 
@@ -189,157 +190,154 @@ else:
     runs_df = pd.read_csv(tableFolder.joinpath("project.csv"), index_col=0)
     config_list_df = pd.read_csv(tableFolder.joinpath("project_config.csv"), index_col=0)
 
-
-if not is_regression:
-
-    # plot all parameters
-    # fig, ax = plt.subplots(1,5, figsize=(15,5))
-    # plot_df = runs_df.copy()
-    # ax[0].plot(plot_df['acc_OTI'], plot_df['distance_OTI'], 'o')
-    # ax[0].set_xlabel("Normalized Accucracy OTI")
-    # ax[0].set_ylabel("Normalized Distance OTI")
-    # ax[1].plot(plot_df['distance_P14'], plot_df['distance_OT3'], 'o')
-    # ax[1].set_xlabel("Normalized Distance P14")
-    # ax[1].set_ylabel("Normalized Distance OT3")
-    # ax[2].plot(plot_df['synthetic_EC50_OTI'], plot_df['synthetic_EC50_P14'], 'o')
-    # ax[2].set_xlabel("Synthetic EC50 OTI")
-    # ax[2].set_ylabel("Synthetic EC50 P14")
-    # ax[3].plot(plot_df['synthetic_EC50_OTI'], plot_df['synthetic_EC50_OT3'], 'o')
-    # ax[3].set_xlabel("Synthetic EC50 OTI") 
-    # ax[3].set_ylabel("Synthetic EC50 OT3")
-    # ax[4].plot(plot_df['distance_conc'], plot_df['synthetic_EC50_conc'], 'o')
-    # ax[4].set_xlabel("Normalized Distance conc") 
-    # ax[4].set_ylabel("Synthetic EC50 conc")
-    # plt.suptitle("Model performances normalized")
-    # plt.show()
-
-    
-
-    # find max and mix value for all metrics to normalize between 0 and 1
-
-    OTI_best = np.identity(4) * np.array([3383., 2328.,  561., 1563.]).reshape(-1,1)
-    OTI_worst = np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0]]) * np.array([3383., 2328.,  561., 1563.]).reshape(-1,1)
-    P14_best = np.array([[0,0,1,0],[0,0,1,0],[0,1,0,0]])* np.array([2080.,  763.,  831.]).reshape(-1,1)
-    P14_worst = np.array([[1,0,0,0],[1,0,0,0],[0,0,1,0]])* np.array([2080.,  763.,  831.]).reshape(-1,1)
-    OT3_best = np.array([[0,1,0,0],[0,1,0,0]]) * np.array([3975., 3940.]).reshape(-1,1)
-    OT3_worst = np.array([[1,0,0,0],[0,0,1,0]]) * np.array([3975., 3940.]).reshape(-1,1)
-    conc_best = np.array([[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]]) * np.array([  937.,   822., 16914.,  1005.]).reshape(-1,1)
-    conc_worst = np.array([[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]])* np.array([  937.,   822., 16914.,  1005.]).reshape(-1,1)
-    SL_best = np.identity(4) * np.array([9640., 7804., 3427., 4405.]).reshape(-1,1)
-    SL_worst = np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0]])  * np.array([9640., 7804., 3427., 4405.]).reshape(-1,1)
-    OTI_conf_row_label = ['N4', 'Q4', 'Q4H7', 'T4']
-    P14_conf_row_label = ['C9', 'L6F', 'M9']
-    OT3_conf_row_label = ['OT3_N4', 'OT3_Q4']
-    conc_conf_row_label = [-10, -12, -6, -8]
-    SL_conf_row_label = ['N4', 'Q4', 'Q4H7', 'T4']
-    prediction_labels = ['N4', 'Q4', 'Q4H7', 'T4']
-
-    iterable_ideal = [(OTI_best, OTI_conf_row_label, "OTI_best"),(P14_best, P14_conf_row_label, "P14_best"),\
-                (OT3_best,OT3_conf_row_label, "OT3_best"), (conc_best, conc_conf_row_label, "conc_best"),\
-                    (SL_best, SL_conf_row_label, "SL_best"), (OTI_worst, OTI_conf_row_label, "OTI_worst"),(P14_worst, P14_conf_row_label, "P14_worst"),\
-                (OT3_worst,OT3_conf_row_label, "OT3_worst"), (conc_worst, conc_conf_row_label, "conc_worst"),\
-                    (SL_worst, SL_conf_row_label, "SL_worst")]
-
-    row_ec50_dist_ideal = {}
-    row_ec50_ideal = {}   
-    ec50_dist_ideal = {}
-
-    row_dist_ideal= {}
-    dist_ideal = {}
-    for conf, labels, name in iterable_ideal:
-            # do matrix multiplication of this row by EC50 values of the colomns labels
-
-        row_ec50_ideal.update({name:np.dot(conf, np.array([EC50[label] for label in prediction_labels]))/np.sum(conf, axis = 1)})
-        row_ec50_dist_ideal.update({name : np.abs([EC50[label] for label in labels] - row_ec50_ideal[name])})
-        ec50_dist_ideal.update({name:np.average(row_ec50_dist_ideal[name], weights = np.sum(conf, axis = 1))})
-
-        GT = np.array([EC50[v] for v in prediction_labels])
-        pred = np.array([EC50[v] for v in labels])
-        this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
-        # print(this_distance_matrix)
-        # transpose this distnace matrix to have shape (num labels, num prediction labels)
-            # do matrix multiplication of this row by EC50 values of the colomns labels
-        dist_ideal.update({name:np.sum(conf*this_distance_matrix)/np.sum(conf)})
-        row_dist_ideal.update({name:np.sum(conf*this_distance_matrix, axis=1)/np.sum(conf, axis=1)})
+# plot all parameters
+# fig, ax = plt.subplots(1,5, figsize=(15,5))
+# plot_df = runs_df.copy()
+# ax[0].plot(plot_df['acc_OTI'], plot_df['distance_OTI'], 'o')
+# ax[0].set_xlabel("Normalized Accucracy OTI")
+# ax[0].set_ylabel("Normalized Distance OTI")
+# ax[1].plot(plot_df['distance_P14'], plot_df['distance_OT3'], 'o')
+# ax[1].set_xlabel("Normalized Distance P14")
+# ax[1].set_ylabel("Normalized Distance OT3")
+# ax[2].plot(plot_df['synthetic_EC50_OTI'], plot_df['synthetic_EC50_P14'], 'o')
+# ax[2].set_xlabel("Synthetic EC50 OTI")
+# ax[2].set_ylabel("Synthetic EC50 P14")
+# ax[3].plot(plot_df['synthetic_EC50_OTI'], plot_df['synthetic_EC50_OT3'], 'o')
+# ax[3].set_xlabel("Synthetic EC50 OTI") 
+# ax[3].set_ylabel("Synthetic EC50 OT3")
+# ax[4].plot(plot_df['distance_conc'], plot_df['synthetic_EC50_conc'], 'o')
+# ax[4].set_xlabel("Normalized Distance conc") 
+# ax[4].set_ylabel("Synthetic EC50 conc")
+# plt.suptitle("Model performances normalized")
+# plt.show()
 
 
 
-    norm_df = runs_df.copy() 
-    this_min = [0.5, dist_ideal['OTI_best'], dist_ideal['P14_best'], dist_ideal['OT3_best'], dist_ideal['conc_best'], dist_ideal['SL_best'], \
-                ec50_dist_ideal['OTI_best'], ec50_dist_ideal['P14_best'], ec50_dist_ideal['OT3_best'], ec50_dist_ideal['conc_best'], ec50_dist_ideal['SL_best'], 
-                0.25,0.25,0.25,0.25,0.25, -1, -1, -1, -1, -1]
-    this_max = [0.7, dist_ideal['OTI_worst'], dist_ideal['P14_worst'], dist_ideal['OT3_worst'], dist_ideal['conc_worst'], dist_ideal['SL_worst'], \
-                ec50_dist_ideal['OTI_worst'], ec50_dist_ideal['P14_worst'], ec50_dist_ideal['OT3_worst'], ec50_dist_ideal['conc_worst'], ec50_dist_ideal['SL_worst'], \
-                    1,1,1,1,1, 1, 1, 1, 1, 1]
-    # this_min_row_synthetic_ec50 = [v for k,v in row_ec50_dist_best.items() if 'best' in k]
-    # this_max_row_synthetic_ec50 = [v for k,v in row_ec50_dist_best.items() if 'worst' in k]
-    this_min_row_distance = [v for k,v in row_dist_ideal.items() if 'best' in k]
-    this_max_row_distance = [v for k,v in row_dist_ideal.items() if 'worst' in k]
-    # this_min = [0.5,    0.6,    1.7 ,   1.1,    0,      0,      0.35,   1.5,    0.2,    0,      0]
-    # this_max = [0.7,    1.1,    2,      1.5,    1.2,    1.5,    0.9,    2.80,   0.7,    1.2,    1.2] 
-    # this_percentile_1 = runs_df.iloc[:,2:].quantile(0.00, axis=0)
-    for i, col in enumerate(runs_df.iloc[:,2:].columns):
-        norm_df[col] = (runs_df[col] - this_min[i]) / (this_max[i] - this_min[i])
-    # for i, col in enumerate(runs_df.iloc[:,2:].columns):
-    #     norm_df.loc[norm_df[col] > 1, :] = np.nan
-    #     norm_df.loc[norm_df[col] < 0, :] = np.nan
+# find max and mix value for all metrics to normalize between 0 and 1
+
+OTI_best = np.identity(4) * np.array([3383., 2328.,  561., 1563.]).reshape(-1,1)
+OTI_worst = np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0]]) * np.array([3383., 2328.,  561., 1563.]).reshape(-1,1)
+P14_best = np.array([[0,0,1,0],[0,0,1,0],[0,1,0,0]])* np.array([2080.,  763.,  831.]).reshape(-1,1)
+P14_worst = np.array([[1,0,0,0],[1,0,0,0],[0,0,1,0]])* np.array([2080.,  763.,  831.]).reshape(-1,1)
+OT3_best = np.array([[0,1,0,0],[0,1,0,0]]) * np.array([3975., 3940.]).reshape(-1,1)
+OT3_worst = np.array([[1,0,0,0],[0,0,1,0]]) * np.array([3975., 3940.]).reshape(-1,1)
+conc_best = np.array([[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]]) * np.array([  937.,   822., 16914.,  1005.]).reshape(-1,1)
+conc_worst = np.array([[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]])* np.array([  937.,   822., 16914.,  1005.]).reshape(-1,1)
+SL_best = np.identity(4) * np.array([9640., 7804., 3427., 4405.]).reshape(-1,1)
+SL_worst = np.array([[0,0,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0]])  * np.array([9640., 7804., 3427., 4405.]).reshape(-1,1)
+OTI_conf_row_label = ['N4', 'Q4', 'Q4H7', 'T4']
+P14_conf_row_label = ['C9', 'L6F', 'M9']
+OT3_conf_row_label = ['OT3_N4', 'OT3_Q4']
+conc_conf_row_label = [-10, -12, -6, -8]
+SL_conf_row_label = ['N4', 'Q4', 'Q4H7', 'T4']
+prediction_labels = ['N4', 'Q4', 'Q4H7', 'T4']
+
+iterable_ideal = [(OTI_best, OTI_conf_row_label, "OTI_best"),(P14_best, P14_conf_row_label, "P14_best"),\
+            (OT3_best,OT3_conf_row_label, "OT3_best"), (conc_best, conc_conf_row_label, "conc_best"),\
+                (SL_best, SL_conf_row_label, "SL_best"), (OTI_worst, OTI_conf_row_label, "OTI_worst"),(P14_worst, P14_conf_row_label, "P14_worst"),\
+            (OT3_worst,OT3_conf_row_label, "OT3_worst"), (conc_worst, conc_conf_row_label, "conc_worst"),\
+                (SL_worst, SL_conf_row_label, "SL_worst")]
+
+row_ec50_dist_ideal = {}
+row_ec50_ideal = {}   
+ec50_dist_ideal = {}
+
+row_dist_ideal= {}
+dist_ideal = {}
+for conf, labels, name in iterable_ideal:
+        # do matrix multiplication of this row by EC50 values of the colomns labels
+
+    row_ec50_ideal.update({name:np.dot(conf, np.array([EC50[label] for label in prediction_labels]))/np.sum(conf, axis = 1)})
+    row_ec50_dist_ideal.update({name : np.abs([EC50[label] for label in labels] - row_ec50_ideal[name])})
+    ec50_dist_ideal.update({name:np.average(row_ec50_dist_ideal[name], weights = np.sum(conf, axis = 1))})
+
+    GT = np.array([EC50[v] for v in prediction_labels])
+    pred = np.array([EC50[v] for v in labels])
+    this_distance_matrix = cdist(pred.reshape(-1,1), GT.reshape(-1,1), metric='euclidean')
+    # print(this_distance_matrix)
+    # transpose this distnace matrix to have shape (num labels, num prediction labels)
+        # do matrix multiplication of this row by EC50 values of the colomns labels
+    dist_ideal.update({name:np.sum(conf*this_distance_matrix)/np.sum(conf)})
+    row_dist_ideal.update({name:np.sum(conf*this_distance_matrix, axis=1)/np.sum(conf, axis=1)})
 
 
-    w_P14 = 1
-    w_OT3 = 1
-    w_OTI = 1
-    norm_df['composite_score_accuracy'] = np.sqrt(w_OTI * (1-norm_df['acc_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2)
-    norm_df['composite_score_distance'] = np.sqrt(w_OTI * (norm_df['distance_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2)
-    norm_df['composite_score_syntheticEC50'] = np.sqrt(w_OTI * (norm_df['synthetic_EC50_OTI'])**2 + w_P14 * (norm_df['synthetic_EC50_P14'])**2 + w_OT3 * (norm_df['synthetic_EC50_OT3'])**2)
-    norm_df['composite_score_distance_withSD'] = np.sqrt(w_OTI * (norm_df['distance_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2 + \
-                                                         w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2)
-    norm_df['composite_score_syntheticEC50_withSD'] = np.sqrt(w_OTI * (norm_df['synthetic_EC50_OTI'])**2 + w_P14 * (norm_df['synthetic_EC50_P14'])**2 + w_OT3 * (norm_df['synthetic_EC50_OT3'])**2 + \
-                                                         (w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2))
-    norm_df['composite_score_spearman'] = np.sqrt(w_OTI * (1 - norm_df['spearman_corr_OTI'])**2 + w_P14 * (1 - norm_df['spearman_corr_P14'])**2 + w_OT3 * (1 - norm_df['spearman_corr_OT3'])**2)
-    norm_df['composite_score_spearman_SD'] = np.sqrt(w_OTI * (1 - norm_df['spearman_corr_OTI'])**2 + w_P14 * (1 - norm_df['spearman_corr_P14'])**2 + w_OT3 * (1 - norm_df['spearman_corr_OT3'])**2 + \
-                                                           w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2)
-    
-    accuracy_min_idx = norm_df['composite_score_accuracy'].idxmin()
-    distance_min_idx = norm_df['composite_score_distance'].idxmin()
-    synthetic_min_idx = norm_df['composite_score_syntheticEC50'].idxmin()
-    distance_SD_min_idx = norm_df['composite_score_distance_withSD'].idxmin()
-    synthetic_SD_min_idx = norm_df['composite_score_syntheticEC50_withSD'].idxmin()
-    spearman_min_idx = norm_df['composite_score_spearman'].idxmin()
-    spearman_SD_min_idx = norm_df['composite_score_spearman_SD'].idxmin()   
-    
-    best_model_accuracy =  pd.concat([
-        runs_df.loc[accuracy_min_idx],
-        norm_df.loc[accuracy_min_idx]], axis=1)
-    best_model_distance =  pd.concat([
-        runs_df.loc[distance_min_idx],
-        norm_df.loc[distance_min_idx]], axis=1)
-    best_model_syntheticEC50=  pd.concat([
-        runs_df.loc[synthetic_min_idx],
-        norm_df.loc[synthetic_min_idx]], axis=1)
-    best_model_distance_SD =  pd.concat([
-        runs_df.loc[distance_SD_min_idx],
-        norm_df.loc[distance_SD_min_idx]], axis=1)
-    best_model_syntheticEC50_SD =  pd.concat([
-        runs_df.loc[synthetic_SD_min_idx],
-        norm_df.loc[synthetic_SD_min_idx]], axis=1)
-    best_model_spearman =  pd.concat([
-        runs_df.loc[spearman_min_idx],
-        norm_df.loc[spearman_min_idx]], axis=1)
-    best_model_spearman_SD   =  pd.concat([
-        runs_df.loc[spearman_SD_min_idx],
-        norm_df.loc[spearman_SD_min_idx]], axis=1)
+
+norm_df = runs_df.copy() 
+this_min = [0.5, dist_ideal['OTI_best'], dist_ideal['P14_best'], dist_ideal['OT3_best'], dist_ideal['conc_best'], dist_ideal['SL_best'], \
+            ec50_dist_ideal['OTI_best'], ec50_dist_ideal['P14_best'], ec50_dist_ideal['OT3_best'], ec50_dist_ideal['conc_best'], ec50_dist_ideal['SL_best'], 
+            0.25,0.25,0.25,0.25,0.25, -1, -1, -1, -1, -1]
+this_max = [0.7, dist_ideal['OTI_worst'], dist_ideal['P14_worst'], dist_ideal['OT3_worst'], dist_ideal['conc_worst'], dist_ideal['SL_worst'], \
+            ec50_dist_ideal['OTI_worst'], ec50_dist_ideal['P14_worst'], ec50_dist_ideal['OT3_worst'], ec50_dist_ideal['conc_worst'], ec50_dist_ideal['SL_worst'], \
+                1,1,1,1,1, 1, 1, 1, 1, 1]
+# this_min_row_synthetic_ec50 = [v for k,v in row_ec50_dist_best.items() if 'best' in k]
+# this_max_row_synthetic_ec50 = [v for k,v in row_ec50_dist_best.items() if 'worst' in k]
+this_min_row_distance = [v for k,v in row_dist_ideal.items() if 'best' in k]
+this_max_row_distance = [v for k,v in row_dist_ideal.items() if 'worst' in k]
+# this_min = [0.5,    0.6,    1.7 ,   1.1,    0,      0,      0.35,   1.5,    0.2,    0,      0]
+# this_max = [0.7,    1.1,    2,      1.5,    1.2,    1.5,    0.9,    2.80,   0.7,    1.2,    1.2] 
+# this_percentile_1 = runs_df.iloc[:,2:].quantile(0.00, axis=0)
+for i, col in enumerate(runs_df.iloc[:,2:].columns):
+    norm_df[col] = (runs_df[col] - this_min[i]) / (this_max[i] - this_min[i])
+# for i, col in enumerate(runs_df.iloc[:,2:].columns):
+#     norm_df.loc[norm_df[col] > 1, :] = np.nan
+#     norm_df.loc[norm_df[col] < 0, :] = np.nan
 
 
-    print(best_model_accuracy)
-    print(best_model_distance)
-    print(best_model_syntheticEC50)
-    print(best_model_distance_SD)   
-    print(best_model_syntheticEC50_SD)
-    print(best_model_spearman)
-    print(best_model_spearman_SD)
+w_P14 = 1
+w_OT3 = 1
+w_OTI = 1
+norm_df['composite_score_accuracy'] = np.sqrt(w_OTI * (1-norm_df['acc_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2)
+norm_df['composite_score_distance'] = np.sqrt(w_OTI * (norm_df['distance_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2)
+norm_df['composite_score_syntheticEC50'] = np.sqrt(w_OTI * (norm_df['synthetic_EC50_OTI'])**2 + w_P14 * (norm_df['synthetic_EC50_P14'])**2 + w_OT3 * (norm_df['synthetic_EC50_OT3'])**2)
+norm_df['composite_score_distance_withSD'] = np.sqrt(w_OTI * (norm_df['distance_OTI'])**2 + w_P14 * (norm_df['distance_P14'])**2 + w_OT3 * (norm_df['distance_OT3'])**2 + \
+                                                    w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2)
+norm_df['composite_score_syntheticEC50_withSD'] = np.sqrt(w_OTI * (norm_df['synthetic_EC50_OTI'])**2 + w_P14 * (norm_df['synthetic_EC50_P14'])**2 + w_OT3 * (norm_df['synthetic_EC50_OT3'])**2 + \
+                                                    (w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2))
+norm_df['composite_score_spearman'] = np.sqrt(w_OTI * (1 - norm_df['spearman_corr_OTI'])**2 + w_P14 * (1 - norm_df['spearman_corr_P14'])**2 + w_OT3 * (1 - norm_df['spearman_corr_OT3'])**2)
+norm_df['composite_score_spearman_SD'] = np.sqrt(w_OTI * (1 - norm_df['spearman_corr_OTI'])**2 + w_P14 * (1 - norm_df['spearman_corr_P14'])**2 + w_OT3 * (1 - norm_df['spearman_corr_OT3'])**2 + \
+                                                    w_OTI * (norm_df['SD_OTI'])**2 + w_P14 * (norm_df['SD_P14'])**2 + w_OT3 * (norm_df['SD_OT3'])**2)
+
+accuracy_min_idx = norm_df['composite_score_accuracy'].idxmin()
+distance_min_idx = norm_df['composite_score_distance'].idxmin()
+synthetic_min_idx = norm_df['composite_score_syntheticEC50'].idxmin()
+distance_SD_min_idx = norm_df['composite_score_distance_withSD'].idxmin()
+synthetic_SD_min_idx = norm_df['composite_score_syntheticEC50_withSD'].idxmin()
+spearman_min_idx = norm_df['composite_score_spearman'].idxmin()
+spearman_SD_min_idx = norm_df['composite_score_spearman_SD'].idxmin()   
+
+best_model_accuracy =  pd.concat([
+    runs_df.loc[accuracy_min_idx],
+    norm_df.loc[accuracy_min_idx]], axis=1)
+best_model_distance =  pd.concat([
+    runs_df.loc[distance_min_idx],
+    norm_df.loc[distance_min_idx]], axis=1)
+best_model_syntheticEC50=  pd.concat([
+    runs_df.loc[synthetic_min_idx],
+    norm_df.loc[synthetic_min_idx]], axis=1)
+best_model_distance_SD =  pd.concat([
+    runs_df.loc[distance_SD_min_idx],
+    norm_df.loc[distance_SD_min_idx]], axis=1)
+best_model_syntheticEC50_SD =  pd.concat([
+    runs_df.loc[synthetic_SD_min_idx],
+    norm_df.loc[synthetic_SD_min_idx]], axis=1)
+best_model_spearman =  pd.concat([
+    runs_df.loc[spearman_min_idx],
+    norm_df.loc[spearman_min_idx]], axis=1)
+best_model_spearman_SD   =  pd.concat([
+    runs_df.loc[spearman_SD_min_idx],
+    norm_df.loc[spearman_SD_min_idx]], axis=1)
+
+
+print(best_model_accuracy)
+print(best_model_distance)
+print(best_model_syntheticEC50)
+print(best_model_distance_SD)   
+print(best_model_syntheticEC50_SD)
+print(best_model_spearman)
+print(best_model_spearman_SD)
 
 # Save normalized dataframe
-    norm_df.to_csv(Path(tableFolder).joinpath("project_normalized.csv"))
+norm_df.to_csv(Path(tableFolder).joinpath("project_normalized.csv"))
 
 # copy best model folder to a new location
 bestFolder = getPath(is_regression, "")[1].parent

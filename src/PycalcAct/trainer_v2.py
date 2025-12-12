@@ -1,10 +1,8 @@
-from argparse import _ArgumentGroup
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.base import is_regressor
 import torch
 import torch.nn.functional as F
 from colorama import Fore, Style
@@ -13,7 +11,7 @@ from torchinfo import summary as torch_summary
 from torchmetrics import MetricCollection
 from torchmetrics.classification import Accuracy, CohenKappa, ConfusionMatrix
 from PycalcAct.utils.wrapper import on_keyboard_interrup
-from PycalcAct.myCustomCriterion import myMSELoss, myFScore
+from PycalcAct.myCustomCriterion import *
 
 class Trainer:
     def __init__(
@@ -60,6 +58,7 @@ class Trainer:
                 Accuracy=Accuracy(task="multiclass", num_classes=self.dataset.num_classes("OTI")),
                 CohenKappa=CohenKappa(task="multiclass", num_classes=self.dataset.num_classes("OTI")),
                 myFScore=myFScore(),
+                mySpearman = mySpearman()
             )
         ).to(device)
         
@@ -198,9 +197,11 @@ class Trainer:
         table.add_column("Loss", color="blue", alignment="right")
         table.add_column("Accuracy", color="green", alignment="right")
         table.add_column("myFScore", color="red", alignment="right")
+        table.add_column("mySpearman", color="MAGENTA", alignment="right")
         table.add_column("Loss", color="blue", alignment="right")
         table.add_column("Accuracy", color="green", alignment="right")
-        table.add_column("myFScore", color="red", alignment="right")  
+        table.add_column("myFScore", color="red", alignment="right") 
+        table.add_column("mySpearman", color="MAGENTA", alignment="right")
         t_since_last_best = 0
         for e in table(
             range(n_epochs),
@@ -252,8 +253,10 @@ class Trainer:
                         # table.update(self._store_best, scores[self._store_best].item() * 100**(not self._store_best == "myFScore"), color="green")
                         table.update("Accuracy", scores["Accuracy"].item() * 100, color="green")
                         table.update("myFScore", scores["myFScore"].item(), color="red")
+                        table.update("mySpearman", scores["mySpearman"].item(), color="MAGENTA")
                         table.update("Accuracy", scores["Accuracy"].item() * 100, color="green")
                         table.update("myFScore", scores["myFScore"].item(), color="red")
+                        table.update("mySpearman", scores["mySpearman"].item(), color="MAGENTA")
 
                     t_since_last_best = 0
                     table.next_row()

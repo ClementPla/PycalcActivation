@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.utils.class_weight import compute_class_weight
-
+from scipy.ndimage import gaussian_filter1d
 
 def process_dataset(df, filter_bool=None, this_dict=None, is_regression=False, col_classesAPL = 6):
 
@@ -172,7 +172,7 @@ class FromMultiFileCSV:
         assert all([p.exists() for p in datapath]), "All paths should exist"
         assert "legend.csv" in [p.name for p in datapath], "legend.csv should be present in the list of paths"
 
-        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, EC50) ####
+        self.flegend = FromLegendFileCSV([p for p in datapath if p.name == "legend.csv"][0], customFilter, is_regression, EC50 = EC50) ####
         self.all_data = concatenate_other_data(self.flegend.all_data, datapath) ####
 
     @property
@@ -234,12 +234,15 @@ class Dataset:
         replace_nan_by_min=True,
         customFilter = None,
         is_regression = False,
+        scramble_mean = False,
+        scramble_time = False,
+        smooth_time = False,
     ):
         # Load data from file
         if isinstance(csv_path, str) or isinstance(csv_path, Path):
-            f = FromLegendFileCSV(csv_path, customFilter, is_regression, EC50)
+            f = FromLegendFileCSV(csv_path, customFilter, is_regression, EC50 = EC50)
         elif isinstance(csv_path, list):
-            f = FromMultiFileCSV(csv_path, customFilter, is_regression, EC50)
+            f = FromMultiFileCSV(csv_path, customFilter, is_regression, EC50 = EC50)
         
         # transfer attributes of dataset to self
         self.f = f 
@@ -253,6 +256,9 @@ class Dataset:
         self.length_serie = f.length_serie
         self.n_classes = f.n_classes
         self._autocuda = True
+        self.smooth_time = smooth_time
+        self.scramble_time = scramble_time
+        self.scramble_mean = scramble_mean
                 
         # Add position if needed
         if csv_pos_path is not None:
@@ -270,7 +276,7 @@ class Dataset:
             elif self.f.all_data[k]["x"].ndim != 3:
                 raise ValueError("Data should be 2D or 3D")
             
-            # remove mean and replace nan if necessary
+            # remove mean, replace nan, scramble time, smooth time and scramble mean if necessary
             calcium_dims = [i for i, n in enumerate(self.f.all_data[k]["fnames"]) if 'calcium' in n]
             for dim in calcium_dims:
                 for row in self.f.all_data[k]["x"][:,dim,:]:
@@ -282,6 +288,21 @@ class Dataset:
                     else:
                         min_val = 0
                     row[np.isnan(row)] = min_val
+    
+                    if scramble_time:
+                        time_indices = np.arange(-120, 0)
+                        np.random.shuffle(time_indices)
+                        row[:] = row[time_indices]
+
+                    if smooth_time:
+                        row[:] = gaussian_filter1d(row, sigma = torch.randint(2,50,(1,)).item())
+                
+                if scramble_mean:
+                    mean_val = np.nanmean(self.f.all_data[k]["x"][:,dim,:], axis=1)
+                    shuffled_means = np.random.permutation(mean_val)
+                    for i, row in enumerate(self.f.all_data[k]["x"][:,dim,:]):
+                        row[:] = row - mean_val[i] + shuffled_means[i]
+
         sk = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
         skval = StratifiedShuffleSplit(n_splits=2, test_size=val_size, random_state=seed)
 
@@ -470,6 +491,22 @@ class Dataset:
         """Return the whole validation data"""
         return self.batch_from_data(self.x_val, self.y_val, time_first, to_cuda and self._autocuda)
 
+    def P14_batch(self, time_first=False, to_cuda=True):
+        """Return the whole P14 data"""
+        return self.batch_from_data(self.f.all_data["P14"]["x"], self.f.all_data["P14"]["y"], time_first, to_cuda and self._autocuda)
+    
+    def OT3_batch(self, time_first=False, to_cuda=True):
+        """Return the whole OT3 data"""
+        return self.batch_from_data(self.f.all_data["OT3"]["x"], self.f.all_data["OT3"]["y"], time_first, to_cuda and self._autocuda)
+    
+    def SL_batch(self, time_first=False, to_cuda=True):
+        """Return the whole SL data"""
+        return self.batch_from_data(self.f.all_data["SL"]["x"], self.f.all_data["SL"]["y"], time_first, to_cuda and self._autocuda)
+    
+    def conc_batch(self, time_first=False, to_cuda=True):
+        """Return the whole conc data"""
+        return self.batch_from_data(self.f.all_data["conc"]["x"], self.f.all_data["conc"]["y"], time_first, to_cuda and self._autocuda)
+    
     def to(self, device):
         if device == "cuda":
             self._autocuda = True

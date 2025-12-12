@@ -33,6 +33,7 @@ class Trainer:
         use_class_weights=True,
         regression_bounds_y=None,
         regression_bounds_y_pred=None,
+        loss = None,
     ) -> None:
         self.device = device
         self.model = model.to(device)
@@ -46,7 +47,7 @@ class Trainer:
         self.optim = optim if optim else self.default_optimizer()
         self.criterion = criterion if criterion else self.default_criterion()
         self.scheduler = scheduler
-
+        self.loss = loss
         self.regression_bounds_y = regression_bounds_y
         self.regression_bounds_y_pred = regression_bounds_y_pred
         self._initial_optim_state_dict = deepcopy(self.optim.state_dict())
@@ -60,6 +61,7 @@ class Trainer:
                 Accuracy=Accuracy(task="multiclass", num_classes=self.dataset.num_classes),
                 CohenKappa=CohenKappa(task="multiclass", num_classes=self.dataset.num_classes),
                 myFScore=myFScore(),
+
             )
         ).to(device)
         
@@ -79,9 +81,14 @@ class Trainer:
             if self.use_class_weights:
                 return myMSELoss(weights=self.dataset.weights, classes=np.unique(self.dataset.y_train))
             else:
-                return torch.nn.MSELoss()
-                # return torch.nn.L1Loss()
-                # return torch.nn.HuberLoss()
+                if self.loss == "MSE":
+                    return torch.nn.MSELoss()
+                elif self.loss == "L1":
+                    return torch.nn.L1Loss()
+                elif self.loss == "Huber":
+                    return torch.nn.HuberLoss()
+                else:
+                    return torch.nn.MSELoss()
         else:
             if self.use_class_weights:
                 return torch.nn.CrossEntropyLoss(weight=self.dataset.weights).to(self.device)

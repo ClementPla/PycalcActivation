@@ -72,7 +72,7 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50
     weight_decay=config['weight_decay']
     batch_size = config['batch_size']
     store_best = config['store_best']
-    loss = config['loss']
+    myLoss = config['myLoss']
     customFilter = None
 
     dataFolder, saveFolder = getPath(is_regression, sweep_id)   
@@ -102,12 +102,13 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50
     else:
         csv_pos_path = None
         position_to_displacement = False
-        
-    EC50 = pd.read_csv("EC50.csv", index_col=None , header=None)
+
+    EC50 = pd.read_csv(EC50_path, index_col=None , header=None)
     EC50 = {
-        (row.iloc[0] if pos < 9 else int(row.iloc[0])): row.iloc[1]
-        for pos, (_, row) in enumerate(EC50.iterrows())
+        (row.iloc[0]): row.iloc[1]
+        for _, (_, row) in enumerate(EC50.iterrows())
     }
+    
     dataset = Dataset(
         csv_path = csv_path,
         csv_pos_path=csv_pos_path,  # Optional
@@ -116,7 +117,7 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50
         replace_nan_by_min=replace_nan_by_min,
         customFilter = customFilter, 
         is_regression=is_regression, #True,
-        EC50 = EC50
+        EC50 = EC50,
         # Convert the x, y position to a single displacement value (sqrt((x(t+1)-x(t))^2 + (y(t+1)-y(t))^2)
         )
 
@@ -167,11 +168,11 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50
         store_best= store_best,
         use_class_weights = weighted,
         is_regression = is_regression,
-        regression_bounds_y = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
-        regression_bounds_y_pred = torch.Tensor([-12,-10,-9]).to("cuda") if is_regression else None,
+        regression_bounds_y = torch.Tensor([-13,-10,-9]).to("cuda") if is_regression else None,
+        regression_bounds_y_pred = torch.Tensor([-13,-10,-9]).to("cuda") if is_regression else None,
         initial_lr=initial_lr,
         weight_decay=weight_decay,
-        loss = loss,
+        loss = myLoss,
     ) 
 
     return model_unique_name, trainer
@@ -218,7 +219,7 @@ def save_model_perf(trainer, model_unique_name, sweep_id, save = True):
         np.save(thisPath.joinpath('metrics.npy'), metrics)
 
     with open(thisPath.joinpath("metrics.csv"), mode="w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=["Accuracy", "CohenKappa", "myFScore"])
+        writer = csv.DictWriter(file, fieldnames=trainer.metrics.keys())
         writer.writeheader()
         writer.writerows(metrics)
 
@@ -248,7 +249,7 @@ def save_model_perf(trainer, model_unique_name, sweep_id, save = True):
             trainer.load_best()     
             y_pred = trainer.model(torch.Tensor(x)).squeeze()
             f = myFScore()
-            f.update(preds = y_pred.detach().clone(), target = y.detach().clone())
+            f.update(preds = y_pred.detach().clone().cpu(), target = y.detach().clone().cpu())
             fig = plt.figure()
             for cls in all_classes:
                 _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}", density = True)
@@ -261,7 +262,7 @@ def save_model_perf(trainer, model_unique_name, sweep_id, save = True):
             trainer.load_last()
             y_pred = trainer.model(torch.Tensor(x)).squeeze()
             f = myFScore()
-            f.update(preds = y_pred.detach().clone(), target = y.detach().clone())
+            f.update(preds = y_pred.detach().clone().cpu(), target = y.detach().clone().cpu())
             fig = plt.figure()
             for cls in all_classes:
                 _ = plt.hist(y_pred[y == cls].cpu().detach().numpy(), 50, alpha=0.5, label=f"Class {cls}", density = True)
@@ -281,7 +282,7 @@ def save_model_perf(trainer, model_unique_name, sweep_id, save = True):
     return metric_train, metric_val, metric_test, allMetrics, metrics
 
 
-def save_model_generalizability(trainer, model_unique_name, sweep_id, save = True):
+def save_model_generalizability(trainer, model_unique_name, sweep_id, save = True, EC50_path = "D:\sebastien\PycalcActivation\EC50.csv"):
     # save model
     _, saveFolder = getPath(trainer.is_regression, sweep_id)   
     thisPath = saveFolder.joinpath(model_unique_name)
@@ -289,22 +290,12 @@ def save_model_generalizability(trainer, model_unique_name, sweep_id, save = Tru
     thisPath = saveFolder.joinpath(model_unique_name)
     trainer.load_best()
     metrics = {}
-
-    this_dict = {
-                "N4" : -12.9,
-                "Q4" : -10.9,
-                "T4" : -9.5,
-                "Q4H7" : -8.9,
-                "M9" : -11.7,
-                "L6F" : -8.00,
-                "C9" : -8.04,
-                "OT3_N4" : -10.6,
-                "OT3_Q4" : -11.4,
-                "-6" : -12.9,
-                "-8" : -12.9,
-                "-10" : -12.9,
-                "-12" : -12.9,
-            }
+    EC50 = pd.read_csv(EC50_path, index_col=None , header=None)
+    EC50 = {
+        row.iloc[0] : row.iloc[1]
+        for _, (_, row) in enumerate(EC50.iterrows())
+    }
+    this_dict = EC50
     # cost_matrix = {
     #     "OTI" : np.array([[1.0,0.6,0.3,0],[0.6,1.0,0.6,0.3],[0.3,0.6,1.0,0.6], [0,0.3,0.6,1.0]]),
     #     "SL" : np.array([[1.0,0.6,0.3,0],[0.6,1.0,0.6,0.3],[0.3,0.6,1.0,0.6], [0,0.3,0.6,1.0]]),
