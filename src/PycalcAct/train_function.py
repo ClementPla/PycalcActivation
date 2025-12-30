@@ -150,7 +150,7 @@ def setupTrainer(config, is_regression, sweep_id, model_unique_name = None, EC50
                         [4,3,1,2],
                         [3,2,3,1]]).to("cuda")
     
-    if customLoss:
+    if customLoss and not is_regression:
         criterion = myCustomCriterion(weight = dataset.weights, device = "cuda", D = D)
 
     if store_best == None:

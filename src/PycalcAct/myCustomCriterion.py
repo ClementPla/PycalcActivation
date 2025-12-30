@@ -7,7 +7,7 @@ from torchmetrics import Metric
 import numpy as np
 from scipy.stats import f_oneway
 
-class myCustomCriterion:
+class myCustomCriterion: # for classifier
     def __init__(
         self,
         weight,
@@ -122,7 +122,8 @@ class mySpearman(Metric):
 
         return torch.tensor(float(rho), dtype=torch.float32)
 
-    
+
+
 # class myFScore(Metric):
 #     def __init__(self, **kwargs):
 #         super().__init__(**kwargs)

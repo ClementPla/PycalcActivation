@@ -16,7 +16,7 @@ else:
 def objective(config, is_regression, sweep_id):
     model_unique_name, trainer = setupTrainer(config, is_regression, sweep_id, model_unique_name=None, EC50_path = "D:\sebastien\PycalcActivation\EC50.csv")
     n_epoch = 10000
-    val_patience = 150
+    val_patience = 250
     trainer.train(n_epoch, val_patience = val_patience)
     metric_train, metric_val, metric_test, _, _ = save_model_perf(trainer, model_unique_name, sweep_id, save = True)
     metrics = save_model_generalizability(trainer, model_unique_name, sweep_id, save = True, EC50_path = "D:\sebastien\PycalcActivation\EC50.csv")
@@ -62,17 +62,17 @@ sweep_configuration = {
         "replace_nan_by_min" : {"values": [True, False]},
         "remove_mean": {"values": [True, False]},
         "whichFFT" : {"values": [True, False]},
-        "numRNN" : {"values": [1, 2, 3]if not is_regression else [1, 2]},
+        "numRNN" : {"values": [1, 2, 3] if not is_regression else [1, 2]},
         "sizeRNN": {"values": [8, 16, 32, 64] if not is_regression else [4, 8, 16, 32]},
         "bidir" : {"values": [True, False]},
-        "numFC": {"values": [1, 2, 3] if not is_regression else [1, 2]},
+        "numFC": {"values": [1, 2, 3]},
         "sizeFC" :  {"values": [8, 16, 32, 64] if not is_regression else [4, 8, 16, 32]},
         "dropout" : {"min": 0.05, "max": 0.20},
         "weighted" : {"values": [True, False]},
-        "customLoss" : {"values": [False]},
+        "customLoss" : {"values": [True,False] if not is_regression else [False]},
         "initial_lr": {"values": [0.01, 0.001]},
         "weight_decay": {"values": [1e-5, 1e-4, 1e-3]},
-        "batch_size": {"values": [128, 256, 215, 1024, 2048, 4096]},
+        "batch_size": {"values": [128, 256, 512, 1024, 2048, 4096]},
         "store_best": {"values": ["myFScore", "Accuracy", "mySpearman"] if is_regression else ["Accuracy"]},
         "myLoss": {"values": ["MSE", "L1", "Huber"] if is_regression else [None]},
     },
