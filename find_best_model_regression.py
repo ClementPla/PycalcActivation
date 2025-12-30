@@ -534,7 +534,11 @@ best_trainer.model.load_state_dict(checkpoint["best"])
 best_trainer.model.to("cuda")
 del checkpoint
 
-
+confmat_folder = best_model_path.joinpath("confusion_matrices_optimalThr")
+zscore_folder = best_model_path.joinpath("confusion_matrices_zscore")
+zscore_folder.mkdir(exist_ok=True)
+pdf_folder = best_model_path.joinpath("predicted_pdfs")
+pdf_folder.mkdir(exist_ok=True)
 
 callbacks = (
     best_trainer.dataset.test_batch,
@@ -591,12 +595,9 @@ for _, (name, callable) in enumerate(zip(["OTI_Test", "P14", "OT3", "conc", "SL"
 
     # save pdf values to csv
     pdf_df = pd.DataFrame(pdf_values, index=x_eval)
-    pdf_df.to_csv(best_model_path.joinpath(f"{name}_predicted_pdf.csv"))
+    pdf_df.to_csv(pdf_folder.joinpath(f"{name}_predicted_pdf.csv"))
 
 # compute z-score for each confusion matrix row
-confmat_folder = best_model_path.joinpath("confusion_matrices_optimalThr")
-zscore_folder = best_model_path.joinpath("confusion_matrices_zscore")
-zscore_folder.mkdir(exist_ok=True)
 for confmat_file in confmat_folder.iterdir():
     zscore = pd.read_csv(confmat_file, header=None).to_numpy()
     for i in range(1, zscore.shape[0]):
