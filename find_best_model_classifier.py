@@ -10,6 +10,7 @@ matplotlib.use('TkAgg')
 import shutil
 import numpy as np
 from scipy.spatial.distance import cdist
+from scipy.stats import spearmanr
 
 os.environ['WANDB_API_KEY'] = '73246a79f06da26fb325d763bd90ab7fc81bc9e6'
 api = wandb.Api()
@@ -353,7 +354,7 @@ norm_df.to_csv(Path(tableFolder).joinpath("project_normalized.csv"))
 # copy best model folder to a new location
 bestFolder = getPath(is_regression, "")[1].parent
 # best model path with todays date
-best_model_path = Path(bestFolder).joinpath("best_model", f"{pd.Timestamp.now().strftime('%y%m%d')}")
+best_model_path = Path(bestFolder).joinpath("best_model", "251231") #f"{pd.Timestamp.now().strftime('%y%m%d')}"
 best_model_src = Path(bestFolder).joinpath("sweep_1ln4tilj", runs_df['model_unique_name'][distance_min_idx])
 if not os.path.exists(best_model_src):
     best_model_src = Path(bestFolder).joinpath("sweep_67ey3j68", runs_df['model_unique_name'][distance_min_idx])
@@ -390,6 +391,26 @@ prediction_labels = pd.read_csv(os.path.join(best_model_path, "confusionMatrix_O
 iterable_best = [(OTI_conf_best[-4:, :], OTI_conf_row_label, "OTI",0),(P14_conf_best, P14_conf_row_label, "P14",1),\
             (OT3_conf_best,OT3_conf_row_label, "OT3",2), (conc_conf_best, conc_conf_row_label, "conc",3)]
 
+def confusion_to_lists(conf_matrix, x_labels=None, y_labels=None):
+    y_true = []
+    y_pred = []
+
+    n_classes_x = conf_matrix.shape[1]
+    n_classes_y = conf_matrix.shape[0]
+
+    if x_labels is None:
+        x_labels = list(range(n_classes_x))
+    if y_labels is None:
+        y_labels = list(range(n_classes_y))
+
+    for true_label in range(n_classes_y):
+        for pred_label in range(n_classes_x):
+            count = conf_matrix[true_label, pred_label]
+            y_true.extend([y_labels[true_label]] * count)
+            y_pred.extend([x_labels[pred_label]] * count)
+
+    return np.array(y_true), np.array(y_pred)
+
 # row_ec50_dist = {}
 # row_ec50_dist_norm = {}
 row_ec50_best = {}
@@ -397,6 +418,9 @@ row_ec50_best = {}
 # ec50_dist_norm = {}
 row_dist_best = {}
 row_dist_best_norm = {}
+allPred = np.empty((0, 1))
+allGT = np.empty((0, 1))
+sperman_corr_df = {}
 for conf, labels, name, norm_col_row in iterable_best:
     this_apl_ec50 = np.array([EC50[label] for label in prediction_labels])
     row_ec50_best.update({name:np.dot(conf, this_apl_ec50)/np.sum(conf, axis = 1)})
@@ -413,6 +437,19 @@ for conf, labels, name, norm_col_row in iterable_best:
     row_dist_best.update({name:np.sum(conf*this_distance_matrix, axis=1)/np.sum(conf, axis=1 )})
     row_dist_best_norm.update({name:np.abs((row_dist_best[name] - this_min_row_distance[norm_col_row]) / \
                                       (this_max_row_distance[norm_col_row] - this_min_row_distance[norm_col_row]))})
+
+    y_true, y_pred = confusion_to_lists(conf[1:, 1:].astype(int), x_labels=prediction_labels, y_labels=labels)
+    y_true = np.array([EC50[v] for v in y_true])
+    y_pred = np.array([EC50[v] for v in y_pred])
+    spearman_corr, _ = spearmanr(y_true, y_pred)
+    allPred = np.concatenate((allPred, y_pred.reshape(-1, 1)), axis=0)
+    allGT = np.concatenate((allGT, y_true.reshape(-1, 1)), axis=0)
+    spearman_corr_df[name] = spearman_corr
+spearman_corr_df["all"],_ = spearmanr(allGT, allPred)
+allPred_df = pd.concat([pd.DataFrame(allPred, columns=['Pred']), pd.DataFrame(allGT, columns=['GT'])], axis=1)
+allPred_df.to_csv(best_model_path.joinpath("all_predictions.csv"), index=False)
+spearman_corr_df = pd.DataFrame.from_dict(spearman_corr_df, orient='index', columns=['spearman_corr'])
+spearman_corr_df.to_csv(best_model_path.joinpath("all_spearmancorr.csv"))
 
 # write to file
 with open(best_model_path.joinpath("model_info.txt"), "a") as f:

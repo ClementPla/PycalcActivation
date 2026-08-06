@@ -1,5 +1,5 @@
 import pandas as pd
-from scipy.stats import spearmanr, pearsonr, gaussian_kde
+from scipy.stats import spearmanr, pearsonr, gaussian_kde, zscore
 from torch import norm
 import wandb
 import json
@@ -499,7 +499,7 @@ norm_df.to_csv(Path(tableFolder).joinpath("project_normalized.csv"))
 # copy best model folder to a new location
 bestFolder = getPath(is_regression, "")[1].parent
 # best model path with todays date
-best_model_path = Path(bestFolder).joinpath("best_model", f"{pd.Timestamp.now().strftime('%y%m%d')}")
+best_model_path = Path(bestFolder).joinpath("best_model", "251230") #f"{pd.Timestamp.now().strftime('%y%m%d')}"
 best_model_src = Path(bestFolder).joinpath("sweep_rcy5kh8r", norm_df['model_unique_name'][overall_distance_min_idx])
 if not os.path.exists(best_model_src):
     best_model_src = Path(bestFolder).joinpath("sweep_e6dz51o5", norm_df['model_unique_name'][overall_distance_min_idx])
@@ -550,6 +550,17 @@ callbacks = (
 
 for _, (name, callable) in enumerate(zip(["OTI_Test", "P14", "OT3", "conc", "SL"], callbacks)):  
     # Load data
+
+    x, y = callable(True, to_cuda=True)
+    y = y.cpu().detach().numpy().squeeze()
+    if name == "conc":
+        y_ec50 = y.copy()
+        y = best_trainer.dataset.f.all_data["conc"]["classes"]
+
+    encoder = LabelEncoder()
+    y_encoded = encoder.fit_transform(y)    
+
+    y_pred = best_trainer.model(x).squeeze().cpu().detach().numpy()
     print(name)
     if name == "OTI_Test":
         medians = []
@@ -566,18 +577,6 @@ for _, (name, callable) in enumerate(zip(["OTI_Test", "P14", "OT3", "conc", "SL"
         # write optimal thresholds to csv
         optimal_thresholds_df = pd.DataFrame(optimal_thresholds, columns=["optimal_thresholds"])
         optimal_thresholds_df.to_csv(best_model_path.joinpath(f"optimal_thresholds.csv"), index=False)
-
-    x, y = callable(True, to_cuda=True)
-    y = y.cpu().detach().numpy().squeeze()
-    if name == "conc":
-        y_ec50 = y.copy()
-        y = best_trainer.dataset.f.all_data["conc"]["classes"]
-    
-    encoder = LabelEncoder()
-    y_encoded = encoder.fit_transform(y)
-
-    # Make predictions
-    y_pred = best_trainer.model(x).squeeze().cpu().detach().numpy()
 
     # compute pdf of each class
     fig = plt.figure()
@@ -597,20 +596,94 @@ for _, (name, callable) in enumerate(zip(["OTI_Test", "P14", "OT3", "conc", "SL"
     pdf_df = pd.DataFrame(pdf_values, index=x_eval)
     pdf_df.to_csv(pdf_folder.joinpath(f"{name}_predicted_pdf.csv"))
 
-# compute z-score for each confusion matrix row
+def confusion_to_lists(conf_matrix, x_labels=None, y_labels=None):
+    y_true = []
+    y_pred = []
+
+    n_classes_x = conf_matrix.shape[1]
+    n_classes_y = conf_matrix.shape[0]
+
+    if x_labels is None:
+        x_labels = list(range(n_classes_x))
+    if y_labels is None:
+        y_labels = list(range(n_classes_y))
+
+    for true_label in range(n_classes_y):
+        for pred_label in range(n_classes_x):
+            count = conf_matrix[true_label, pred_label]
+            y_true.extend([y_labels[true_label]] * count)
+            y_pred.extend([x_labels[pred_label]] * count)
+
+    return np.array(y_true), np.array(y_pred)
+
+allPred_discretized = np.zeros((0, 1))
+allGT_discretized = np.zeros((0, 1))
+spearman_corr_discretized = {}
 for confmat_file in confmat_folder.iterdir():
-    zscore = pd.read_csv(confmat_file, header=None).to_numpy()
-    for i in range(1, zscore.shape[0]):
-        row = zscore[i,1:].astype(float)
-        row_mean = np.mean(row)
-        row_std = np.std(row)
-        if row_std == 0:
-            zscore[i,1:] = 0
-        else:
-            zscore[i,1:] = (row - row_mean) / row_std
-    pd.DataFrame(zscore).to_csv(zscore_folder.joinpath(confmat_file.name), header=False, index=False)
+    if confmat_file.name != 'optimal_thresholds.csv':
+        # compute z-score for each confusion matrix row
+        print(f"Processing {confmat_file.name}")
+        zscore = pd.read_csv(confmat_file, header=None).to_numpy()
+        y_true, y_pred = confusion_to_lists(zscore[1:, 1:].astype(int), x_labels=zscore[0, 1:], y_labels=zscore[1:, 0])
+        for i in range(1, zscore.shape[0]):
+            row = zscore[i,1:].astype(float)
+            row_mean = np.mean(row)
+            row_std = np.std(row)
+            if row_std == 0:
+                zscore[i,1:] = 0
+            else:
+                zscore[i,1:] = (row - row_mean) / row_std
+        pd.DataFrame(zscore).to_csv(zscore_folder.joinpath(confmat_file.name), header=False, index=False)
+
+        if confmat_file.stem.split("_")[0] != 'conc' and confmat_file.stem.split("_")[0] != "SL":
+        # for each confusion matrix, convert to lists of true and predicted labels and compute spearman correlation
+            print(f"Processing {confmat_file.name} for spearman correlation")
+            y_true = np.array([EC50[v] for v in y_true])
+            y_pred = np.array([EC50[v] for v in y_pred])
+            spearman_corr, _ = spearmanr(y_true, y_pred)
+            allPred_discretized = np.concatenate((allPred_discretized, y_pred.reshape(-1, 1)), axis=0)
+            allGT_discretized = np.concatenate((allGT_discretized, y_true.reshape(-1, 1)), axis=0)
+            # add spearman correlation to dataframe
+            spearman_corr_discretized[confmat_file.stem] = spearman_corr
+spearman_corr_discretized["all"] = spearmanr(allGT_discretized, allPred_discretized)[0]
+allPred_discretized_df = pd.concat([pd.DataFrame(allPred_discretized, columns=['Pred']), pd.DataFrame(allGT_discretized, columns=['GT'])], axis=1)
+allPred_discretized_df.to_csv(best_model_path.joinpath("all_predictions_discretized.csv"), index=False)
+spearman_corr_discretized_df = pd.DataFrame.from_dict(spearman_corr_discretized, orient='index', columns=['spearman_corr'])
+spearman_corr_discretized_df.to_csv(best_model_path.joinpath("all_spearmancorr_discretized.csv"))
+
+# Export all predictions to csv and compute spearman corr for the whole dataset and each class``
+allPred = np.zeros((0, 1))
+allGT = np.zeros((0, 1))
+
+callbacks = (
+    best_trainer.dataset.OTI_batch,
+    best_trainer.dataset.P14_batch,
+    best_trainer.dataset.OT3_batch,
+        )
+spearman_corr_df = {}
+for _, (name, callable) in enumerate(zip(["OTI", "P14", "OT3"], callbacks)):  
+    # Load data
+    
+    x, y = callable(True, to_cuda=True)
+    y = y.cpu().detach().numpy().squeeze()
+    y_pred = best_trainer.model(x).squeeze().cpu().detach().numpy()
+
+    spearman_corr = spearmanr(y, y_pred)
+    spearman_corr_df[name],_ = spearman_corr
+
+    allPred = np.concatenate((allPred, y_pred.reshape(-1, 1)), axis=0)
+    allGT = np.concatenate((allGT, y.reshape(-1, 1)), axis=0)
+
+spearman_corr_df["all"],_ = spearmanr(allGT, allPred)
+spearman_corr_df = pd.DataFrame.from_dict(spearman_corr_df, orient='index', columns=['spearman_corr'])
+spearman_corr_df.to_csv(best_model_path.joinpath("all_spearmancorr.csv"))
 
 
+save_path = best_model_path.joinpath("all_predictions.csv")
+pd.DataFrame(np.concatenate((allGT, allPred), axis=1), columns=["GT", "Pred"]).to_csv(save_path, index=False)
+
+save_path = best_model_path.joinpath("all_spearmancorr.csv")
+spearman_corr_df.to_csv(save_path, index=False)
 
             # medians = []
             # for unique_class in np.unique(y):

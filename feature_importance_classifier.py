@@ -1,4 +1,3 @@
-
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor 
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
@@ -7,6 +6,7 @@ from PycalcAct.model import (
     MixedFCTemporalModel)
 from PycalcAct.trainer_v2 import Trainer
 from PycalcAct.train_function import *
+
 
 ## read project_config and projec_normalized file
 df_values = pd.read_csv('models/round3/classifier/project_normalized.csv')
@@ -57,7 +57,7 @@ final_importance.to_csv('models/round3/classifier/best_model/251211/feature_impo
 
 ## test importance of mean, order, and 'smoothness'
 
-is_regression = False
+is_regression = True
 # import best model
 config = {
     'whichDataset': "ratioNorm",
@@ -76,6 +76,7 @@ config = {
     'batch_size': 128,
     'customLoss': False,
     'remove_mean': False,
+    'loss' : nan,
 }
 EC50_path = Path('EC50.csv')
 dataFolder, saveFolder = getPath(False, "")   

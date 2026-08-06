@@ -1,5 +1,7 @@
+from math import nan
 from operator import is_
 from pathlib import Path
+from networkx import is_empty
 import numpy as np
 import pandas as pd
 import torch
@@ -16,7 +18,7 @@ def process_dataset(df, filter_bool=None, this_dict=None, is_regression=False, c
     df_sorted = df.iloc[sorting_indices].reset_index(drop=True)
 
     # Extract class labels
-    classes = df_sorted.iloc[:, col_classesAPL]
+    classes = df_sorted.iloc[:, col_classesAPL].astype("str")
     unique_classes = classes.unique()
 
     # Extract data (last 120 columns)
@@ -151,7 +153,7 @@ class FromLegendFileCSV:
                                 (df[col_CTFR] == "OT3-CTFR") & (df[col_user] == "ST")).values   
 
         filter_bool_conc = ((df[col_ageSpe] == 1) & (df[col_activated] == 1) & 
-                            (df[col_classesAPL] == "N4") & (df[col_conc].isin(["-6", "-8", "-10", "-12"])) & 
+                            (df[col_classesAPL] == "N4") & (df[col_conc].astype(str).isin(["-6", "-8", "-10", "-12"])) & 
                             (df[col_user] == "ST")).values   
 
         self.all_data = {
@@ -294,8 +296,8 @@ class Dataset:
                         np.random.shuffle(time_indices)
                         row[:] = row[time_indices]
 
-                    if smooth_time:
-                        row[:] = gaussian_filter1d(row, sigma = torch.randint(2,50,(1,)).item())
+                    if smooth_time>0:
+                        row[:] = gaussian_filter1d(row, sigma = smooth_time)
                 
                 if scramble_mean:
                     mean_val = np.nanmean(self.f.all_data[k]["x"][:,dim,:], axis=1)
@@ -309,26 +311,36 @@ class Dataset:
         x = self.f.all_data["OTI"]["x"]
         y = self.f.all_data["OTI"]["y"]
 
-        train_idx, test_idx = next(sk.split(x, y))
+        if x.shape[0] != 0:
+            train_idx, test_idx = next(sk.split(x, y))
+        
+            self.x_train = x[train_idx]
+            self.x_test = x[test_idx]
 
-        self.x_train = x[train_idx]
-        self.x_test = x[test_idx]
+            if not self.is_regression:
+                self.y_train = y[train_idx].astype(int)
+                self.y_test = y[test_idx].astype(int)
+            else:
+                self.y_train = y[train_idx]
+                self.y_test = y[test_idx]
+                    
+            train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
+            self.x_val = self.x_train[val_idx]
+            self.y_val = self.y_train[val_idx]
+            self.x_train = self.x_train[train_idx]
+            self.y_train = self.y_train[train_idx]
 
-        if not self.is_regression:
-            self.y_train = y[train_idx].astype(int)
-            self.y_test = y[test_idx].astype(int)
+            self.max = np.max(self.x_train)
+            self.min = np.min(self.x_train)
         else:
-            self.y_train = y[train_idx]
-            self.y_test = y[test_idx]
-                
-        train_idx, val_idx = next(skval.split(self.x_train, self.y_train))
-        self.x_val = self.x_train[val_idx]
-        self.y_val = self.y_train[val_idx]
-        self.x_train = self.x_train[train_idx]
-        self.y_train = self.y_train[train_idx]
-
-        self.max = np.max(self.x_train)
-        self.min = np.min(self.x_train)
+            self.x_train = np.array([])
+            self.y_train = np.array([])
+            self.x_val = np.array([])
+            self.y_val = np.array([])   
+            self.x_test = np.array([])
+            self.y_test = np.array([])  
+            self.max = nan
+            self.min = nan
 
         self.train_data = x
 
@@ -360,10 +372,12 @@ class Dataset:
 
     @property
     def features(self):
-        return self.x_train.shape[1]
+        return self.train_data.shape[1]
 
     @property
     def weights(self):
+        if self.y_train.shape[0] == 0:
+            return torch.tensor([])
         class_weights = compute_class_weight("balanced", classes=np.unique(self.y_train), y=self.y_train) 
         return torch.from_numpy(class_weights).float()
 
@@ -378,6 +392,8 @@ class Dataset:
         return self.summarize("OTI", True)
 
     def summarize(self, k, include_weights=False):
+        assert k in self.f.all_data.keys(), f"Dataset {k} not found in the data"
+        assert self.f.all_data[k]["x"].shape[0] != 0, f"Dataset {k} is empty"
         labels = self.labels(k)
         data = {"Total": [], **{label: [] for label in labels}}
 
@@ -490,6 +506,10 @@ class Dataset:
     def val_batch(self, time_first=False, to_cuda=True):
         """Return the whole validation data"""
         return self.batch_from_data(self.x_val, self.y_val, time_first, to_cuda and self._autocuda)
+
+    def OTI_batch(self, time_first=False, to_cuda=True):
+        """Return the whole OTI data"""
+        return self.batch_from_data(self.f.all_data["OTI"]["x"], self.f.all_data["OTI"]["y"], time_first, to_cuda and self._autocuda)
 
     def P14_batch(self, time_first=False, to_cuda=True):
         """Return the whole P14 data"""
